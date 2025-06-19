@@ -15,19 +15,18 @@ class _OnboardingPageState extends State<OnboardingPage> {
 
   final List<_OnboardingContent> onboardingContents = [
     _OnboardingContent(
-      image: 'assets/images/surfing.png',
+      image: 'assets/images/onboardnews1.png',
       title: 'Selamat Datang di FastNews',
       subtitle:
-          'Nikmati berita olahraga favorit dari seluruh dunia, langsung di genggamanmu.',
+          'Nikmati berita terkini dari seluruh dunia, langsung di genggamanmu.',
     ),
     _OnboardingContent(
-      image: 'assets/images/basket.png',
+      image: 'assets/images/onboardnews2.png',
       title: 'Update Setiap Hari',
-      subtitle:
-          'Dapatkan update skor, jadwal pertandingan, dan berita eksklusif setiap hari.',
+      subtitle: 'Dapatkan informasi, dan berita eksklusif setiap hari.',
     ),
     _OnboardingContent(
-      image: 'assets/images/tennis.png',
+      image: 'assets/images/onboardnews3.png',
       title: 'Berita yang Kamu Butuhkan',
       subtitle:
           'FastNews menyajikan informasi yang relevan, cepat, dan sesuai minatmu.',
