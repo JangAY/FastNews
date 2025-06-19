@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../services/bookmark_service.dart';
 
 class BookmarksPage extends StatefulWidget {
   const BookmarksPage({Key? key}) : super(key: key);
@@ -9,198 +10,173 @@ class BookmarksPage extends StatefulWidget {
 }
 
 class _BookmarksPageState extends State<BookmarksPage> {
-  // Data dummy untuk daftar bookmark
-  final List<Map<String, String>> bookmarkedArticles = [
-    {
-      'image': 'assets/images/tech.png', // Ganti dengan gambar thumbnail atau placeholder
-      'title': 'Tech Giants Unveil New AI',
-      'category': 'Technology',
-      'time': '2d ago',
-    },
-    {
-      'image': 'assets/images/science.png',
-      'title': 'Breakthrough Discovery in',
-      'category': 'Science',
-      'time': '3d ago',
-    },
-    {
-      'image': 'assets/images/business.png',
-      'title': 'Global Markets React to',
-      'category': 'Business',
-      'time': '4d ago',
-    },
-    {
-      'image': 'assets/images/politics.png',
-      'title': 'Government Announces New',
-      'category': 'Politics',
-      'time': '5d ago',
-    },
-    {
-      'image': 'assets/images/sport.png',
-      'title': 'Local Team Wins',
-      'category': 'Sports',
-      'time': '6d ago',
-    },
-    {
-      'image': 'assets/images/health.png',
-      'title': 'Health Research Progress',
-      'category': 'Health',
-      'time': '1w ago',
-    },
-  ];
+  late Future<List<Map<String, dynamic>>> _bookmarkedArticles;
+
+  @override
+  void initState() {
+    super.initState();
+    _bookmarkedArticles = BookmarkService.getBookmarks();
+  }
+
+  void _refreshBookmarks() {
+    setState(() {
+      _bookmarkedArticles = BookmarkService.getBookmarks();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Column( // Mulai langsung dari Column
-      children: [
-        AppBar( // AppBar kustom
-          backgroundColor: Colors.white,
-          elevation: 0,
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back, color: Colors.black),
-            onPressed: () {
-              Navigator.pop(context);
-            },
-          ),
-          title: Text(
-            'Bookmarks',
-            style: GoogleFonts.poppins(
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
-              color: Colors.black,
+    return Scaffold(
+      backgroundColor: Colors.white,
+      body: Column(
+        children: [
+          AppBar(
+            backgroundColor: Colors.white,
+            elevation: 0,
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back, color: Colors.black),
+              onPressed: () => Navigator.pop(context),
             ),
+            title: Text(
+              'Bookmarks',
+              style: GoogleFonts.poppins(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: Colors.black,
+              ),
+            ),
+            centerTitle: true,
           ),
-          centerTitle: true,
-        ),
-        Expanded( // Bungkus konten list dengan Expanded
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-            child: bookmarkedArticles.isEmpty
-                ? Center(
+          Expanded(
+            child: FutureBuilder<List<Map<String, dynamic>>>(
+              future: _bookmarkedArticles,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return Center(child: CircularProgressIndicator());
+                } else if (snapshot.hasError) {
+                  return Center(child: Text('Error loading bookmarks'));
+                } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                  return Center(
                     child: Text(
-                      'No bookmarks yet. Start saving articles!',
-                      textAlign: TextAlign.center,
+                      'No bookmarks yet',
                       style: GoogleFonts.poppins(
                         fontSize: 16,
                         color: Colors.grey[600],
                       ),
                     ),
-                  )
-                : ListView.builder(
-                    itemCount: bookmarkedArticles.length,
-                    itemBuilder: (context, index) {
-                      final article = bookmarkedArticles[index];
-                      // Pastikan BookmarkedArticleItem diakses dengan benar
-                      return BookmarkedArticleItem(
-                        imageUrl: article['image']!,
-                        title: article['title']!,
-                        category: article['category']!,
-                        timeAgo: article['time']!,
-                      );
-                    },
-                  ),
+                  );
+                }
+
+                final bookmarks = snapshot.data!;
+                return ListView.builder(
+                  padding: EdgeInsets.all(16),
+                  itemCount: bookmarks.length,
+                  itemBuilder: (context, index) {
+                    final article = bookmarks[index];
+                    return _BookmarkItem(
+                      article: article,
+                      onRemove: () {
+                        BookmarkService.removeBookmark(article['articleId']);
+                        _refreshBookmarks();
+                      },
+                    );
+                  },
+                );
+              },
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
 
-// =========================================================================
-// Widget untuk Setiap Item Artikel yang Di-bookmark
-// Pindahkan definisi kelas ini ke sini agar dapat diakses oleh _BookmarksPageState
-// =========================================================================
-class BookmarkedArticleItem extends StatelessWidget {
-  final String imageUrl;
-  final String title;
-  final String category;
-  final String timeAgo;
+class _BookmarkItem extends StatelessWidget {
+  final Map<String, dynamic> article;
+  final VoidCallback onRemove;
 
-  const BookmarkedArticleItem({
-    Key? key,
-    required this.imageUrl,
-    required this.title,
-    required this.category,
-    required this.timeAgo,
-  }) : super(key: key);
+  const _BookmarkItem({
+    required this.article,
+    required this.onRemove,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Tapped on: $title')),
-        );
-      },
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 16),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            // Gambar Thumbnail
-            ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: imageUrl.startsWith('http')
-                  ? Image.network(
-                      imageUrl,
-                      width: 90,
-                      height: 90,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) {
-                        print('Error loading network image: $imageUrl, Exception: $error');
-                        return Container(
-                          width: 90,
-                          height: 90,
-                          color: Colors.grey[200],
-                          child: const Icon(Icons.collections_bookmark_outlined, size: 40, color: Colors.grey),
-                        );
-                      },
-                    )
-                  : Image.asset(
-                      imageUrl,
-                      width: 90,
-                      height: 90,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) {
-                        print('Error loading asset image: $imageUrl, Exception: $error');
-                        return Container(
-                          width: 90,
-                          height: 90,
-                          color: Colors.grey[200],
-                          child: const Icon(Icons.collections_bookmark_outlined, size: 40, color: Colors.grey),
-                        );
-                      },
-                    ),
+    return Card(
+      margin: EdgeInsets.only(bottom: 16),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
+            child: Image.network(
+              article['imageUrl'] ?? 'https://via.placeholder.com/150',
+              height: 180,
+              width: double.infinity,
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) {
+                return Container(
+                  height: 180,
+                  color: Colors.grey[200],
+                  child: Center(child: Icon(Icons.image, color: Colors.grey)),
+                );
+              },
             ),
-            const SizedBox(width: 16),
-            // Judul dan Detail Berita
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    maxLines: 3,
-                    overflow: TextOverflow.ellipsis,
-                    style: GoogleFonts.poppins(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.black87,
+          ),
+          Padding(
+            padding: EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      article['category'] ?? 'General',
+                      style: GoogleFonts.poppins(
+                        fontSize: 12,
+                        color: Color(0xFF6B73FF),
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    '$category • $timeAgo',
-                    style: GoogleFonts.poppins(
-                      fontSize: 12,
-                      color: Colors.grey[600],
+                    IconButton(
+                      icon: Icon(Icons.bookmark, color: Colors.red),
+                      onPressed: onRemove,
                     ),
+                  ],
+                ),
+                SizedBox(height: 8),
+                Text(
+                  article['title'] ?? 'No title',
+                  style: GoogleFonts.poppins(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black87,
                   ),
-                ],
-              ),
+                ),
+                SizedBox(height: 8),
+                Text(
+                  article['date'] ?? 'Unknown date',
+                  style: GoogleFonts.poppins(
+                    fontSize: 12,
+                    color: Colors.grey[500],
+                  ),
+                ),
+                SizedBox(height: 12),
+                Text(
+                  article['description'] ?? 'No description',
+                  style: GoogleFonts.poppins(
+                    fontSize: 14,
+                    color: Colors.grey[600],
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
