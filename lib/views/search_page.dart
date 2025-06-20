@@ -27,6 +27,10 @@ class _SearchPageState extends State<SearchPage> {
     super.initState();
     // 1. Ambil token dan semua artikel saat halaman pertama kali dibuka
     _loadInitialData();
+    // Tambahkan listener untuk rebuild UI saat text berubah (untuk show/hide clear button)
+    _searchController.addListener(() {
+      setState(() {});
+    });
   }
 
   Future<void> _loadInitialData() async {
@@ -34,18 +38,20 @@ class _SearchPageState extends State<SearchPage> {
     _token = prefs.getString('auth_token');
 
     try {
-      // Ambil berita dalam jumlah besar (misal: 100) untuk di-filter di sisi klien
-      // Sesuaikan limit jika perlu
       final response = await _newsService.fetchArticles(limit: 100);
-      setState(() {
-        _allArticles = response['data']['articles'];
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _allArticles = response['data']['articles'];
+          _isLoading = false;
+        });
+      }
     } catch (e) {
-      setState(() {
-        _error = "Failed to load news data.";
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _error = "Failed to load news data.";
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -55,23 +61,17 @@ class _SearchPageState extends State<SearchPage> {
     super.dispose();
   }
 
-  // 2. Fungsi untuk memfilter berita berdasarkan input pengguna
   void _filterArticles(String query) {
     if (query.isEmpty) {
-      // Jika query kosong, kosongkan hasil filter
       setState(() {
         _filteredResults = [];
       });
       return;
     }
 
-    // Lakukan filter pada daftar _allArticles
     final results = _allArticles.where((article) {
-      // Ambil judul, pastikan tidak null, dan ubah ke huruf kecil
       final titleLower = (article['title'] as String? ?? '').toLowerCase();
       final queryLower = query.toLowerCase();
-
-      // Kembalikan true jika judul mengandung query
       return titleLower.contains(queryLower);
     }).toList();
 
@@ -80,9 +80,7 @@ class _SearchPageState extends State<SearchPage> {
     });
   }
 
-  // 3. Widget untuk menampilkan konten berdasarkan state
   Widget _buildContent() {
-    // Tampilkan loading indicator saat mengambil semua data
     if (_isLoading) {
       return Center(child: CircularProgressIndicator());
     }
@@ -90,16 +88,24 @@ class _SearchPageState extends State<SearchPage> {
       return Center(child: Text(_error!, style: GoogleFonts.poppins()));
     }
 
-    // Setelah data ter-load, tampilkan hasil filter
     if (_searchController.text.isNotEmpty && _filteredResults.isEmpty) {
       return Center(
           child: Text('No results found for "${_searchController.text}"',
               style: GoogleFonts.poppins()));
     }
 
+    // Tampilkan pesan jika search bar kosong dan belum ada hasil
+    if (_searchController.text.isEmpty) {
+      return Center(
+        child: Text(
+          'Search for news by title',
+          style: GoogleFonts.poppins(color: Theme.of(context).textTheme.bodySmall?.color),
+        ),
+      );
+    }
+
     return ListView.builder(
       padding: const EdgeInsets.only(top: 16.0),
-      // Gunakan _filteredResults sebagai sumber data
       itemCount: _filteredResults.length,
       itemBuilder: (context, index) {
         final article = _filteredResults[index];
@@ -125,17 +131,14 @@ class _SearchPageState extends State<SearchPage> {
 
   @override
   Widget build(BuildContext context) {
+    // Scaffold dan AppBar sekarang akan menggunakan warna dari tema
     return Scaffold(
-      backgroundColor: Colors.white,
       appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
         title: Text(
           'Search News',
           style: GoogleFonts.poppins(
             fontSize: 18,
             fontWeight: FontWeight.w600,
-            color: Colors.black,
           ),
         ),
         centerTitle: true,
@@ -148,23 +151,24 @@ class _SearchPageState extends State<SearchPage> {
             const SizedBox(height: 16),
             Container(
               decoration: BoxDecoration(
-                color: Colors.grey[100],
+                // Menggunakan warna adaptif untuk latar belakang search bar
+                color: Theme.of(context).dividerColor.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: TextField(
                 controller: _searchController,
                 style: GoogleFonts.poppins(fontSize: 14),
-                autofocus: true, // Otomatis fokus ke search bar
+                autofocus: true,
                 decoration: InputDecoration(
-                  hintText: 'Search by news title...', // <-- Hint text diubah
-                  hintStyle: GoogleFonts.poppins(color: Colors.grey[500]),
-                  prefixIcon: Icon(Icons.search, color: Colors.grey[500]),
+                  hintText: 'Search by news title...',
+                  // Menggunakan warna adaptif untuk hint text dan ikon
+                  hintStyle: GoogleFonts.poppins(color: Theme.of(context).textTheme.bodySmall?.color),
+                  prefixIcon: Icon(Icons.search, color: Theme.of(context).textTheme.bodySmall?.color),
                   suffixIcon: _searchController.text.isNotEmpty
                       ? IconButton(
-                          icon: Icon(Icons.clear, color: Colors.grey[500]),
+                          icon: Icon(Icons.clear, color: Theme.of(context).textTheme.bodySmall?.color),
                           onPressed: () {
                             _searchController.clear();
-                            // Panggil filter dengan string kosong untuk membersihkan hasil
                             _filterArticles('');
                           },
                         )
@@ -172,7 +176,6 @@ class _SearchPageState extends State<SearchPage> {
                   border: InputBorder.none,
                   contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                 ),
-                // 4. Gunakan onChanged untuk filter secara real-time saat pengguna mengetik
                 onChanged: (value) {
                   _filterArticles(value);
                 },
@@ -189,7 +192,6 @@ class _SearchPageState extends State<SearchPage> {
   }
 }
 
-// Widget SearchResultItem tidak perlu diubah
 class SearchResultItem extends StatelessWidget {
   final String imageUrl;
   final String title;
@@ -227,8 +229,8 @@ class SearchResultItem extends StatelessWidget {
                   return Container(
                     width: 80,
                     height: 80,
-                    color: Colors.grey[200],
-                    child: const Icon(Icons.image_not_supported, size: 30, color: Colors.grey),
+                    color: Theme.of(context).dividerColor.withOpacity(0.1),
+                    child: Icon(Icons.image_not_supported, size: 30, color: Theme.of(context).dividerColor),
                   );
                 },
               ),
@@ -245,7 +247,7 @@ class SearchResultItem extends StatelessWidget {
                     style: GoogleFonts.poppins(
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
-                      color: Colors.black87,
+                      // Warna teks judul sekarang adaptif
                     ),
                   ),
                   const SizedBox(height: 4),
@@ -253,7 +255,8 @@ class SearchResultItem extends StatelessWidget {
                     '$category • $timeAgo',
                     style: GoogleFonts.poppins(
                       fontSize: 12,
-                      color: Colors.grey[600],
+                      // Warna teks subjudul sekarang adaptif
+                      color: Theme.of(context).textTheme.bodySmall?.color,
                     ),
                   ),
                 ],

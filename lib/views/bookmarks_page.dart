@@ -30,26 +30,27 @@ class _BookmarksPageState extends State<BookmarksPage> {
   Future<void> _removeBookmark(String articleId) async {
     try {
       await _bookmarkService.removeBookmark(articleId, widget.token);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Bookmark removed')));
+      if(mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Bookmark removed')));
+      }
       _loadBookmarks(); // Refresh the list
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to remove bookmark')));
+      if(mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to remove bookmark')));
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    // Scaffold dan AppBar sekarang akan menggunakan warna dari tema global
     return Scaffold(
-      backgroundColor: Colors.white,
       appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
         title: Text(
           'Bookmarks',
           style: GoogleFonts.poppins(
             fontSize: 18,
             fontWeight: FontWeight.w600,
-            color: Colors.black,
           ),
         ),
         centerTitle: true,
@@ -63,7 +64,11 @@ class _BookmarksPageState extends State<BookmarksPage> {
             return Center(child: Text('Error: ${snapshot.error}'));
           } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
             return Center(
-              child: Text('No bookmarks yet', style: GoogleFonts.poppins()),
+              child: Text(
+                'No bookmarks yet',
+                // Menggunakan warna teks yang adaptif
+                style: GoogleFonts.poppins(color: Theme.of(context).textTheme.bodySmall?.color),
+              ),
             );
           }
 
@@ -105,16 +110,27 @@ class _BookmarkItem extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Card(
+        // Card secara otomatis akan menyesuaikan warna dengan tema
         margin: EdgeInsets.only(bottom: 16),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         elevation: 2,
+        clipBehavior: Clip.antiAlias, // Menambahkan clipBehavior untuk memastikan gambar mengikuti border radius
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Image.network(
               article['imageUrl'] ?? 'https://via.placeholder.com/150',
               height: 180,
               width: double.infinity,
               fit: BoxFit.cover,
+               errorBuilder: (context, error, stackTrace) {
+                  return Container(
+                    height: 180,
+                    width: double.infinity,
+                    color: Theme.of(context).dividerColor.withOpacity(0.1),
+                    child: Icon(Icons.image_not_supported, size: 40, color: Theme.of(context).dividerColor),
+                  );
+                },
             ),
             Padding(
               padding: EdgeInsets.all(16),
@@ -125,6 +141,7 @@ class _BookmarkItem extends StatelessWidget {
                     article['title'] ?? 'No title',
                     style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w600),
                     maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
                   SizedBox(height: 8),
                   Row(
@@ -132,10 +149,12 @@ class _BookmarkItem extends StatelessWidget {
                     children: [
                       Text(
                         article['category'] ?? 'General',
-                        style: GoogleFonts.poppins(color: Color(0xFF6B73FF)),
+                        // Menggunakan warna primer dari tema
+                        style: GoogleFonts.poppins(color: Theme.of(context).primaryColor, fontWeight: FontWeight.w500),
                       ),
                       IconButton(
-                        icon: Icon(Icons.bookmark, color: Colors.red),
+                        // Menggunakan warna primer tema untuk ikon yang menandakan "tersimpan"
+                        icon: Icon(Icons.bookmark, color: Theme.of(context).primaryColor),
                         onPressed: onRemove,
                       ),
                     ],

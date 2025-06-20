@@ -16,24 +16,14 @@ class EditArticlePage extends StatefulWidget {
 class _EditArticlePageState extends State<EditArticlePage> {
   final _formKey = GlobalKey<FormState>();
   late TextEditingController _titleController;
-  // HAPUS: _categoryController tidak diperlukan lagi
-  // late TextEditingController _categoryController; 
   late TextEditingController _contentController;
   late TextEditingController _imageUrlController;
   late TextEditingController _tagsController;
 
-  // Variabel state untuk dropdown
   String? _selectedCategory;
   
-  // Daftar kategori yang sama dengan halaman tambah
   final List<String> _categories = [
-    'Technology',
-    'Sports',
-    'Health',
-    'Business',
-    'Entertainment',
-    'Politics',
-    'Science'
+    'Technology', 'Sports', 'Health', 'Business', 'Entertainment', 'Politics', 'Science'
   ];
 
   final NewsService _newsService = NewsService();
@@ -42,15 +32,12 @@ class _EditArticlePageState extends State<EditArticlePage> {
   @override
   void initState() {
     super.initState();
-    // Initialize controllers with existing article data
     _titleController = TextEditingController(text: widget.article['title']);
     _contentController = TextEditingController(text: widget.article['content']);
     _imageUrlController = TextEditingController(text: widget.article['imageUrl']);
-    _tagsController = TextEditingController(text: (widget.article['tags'] as List?)?.join(', '));
+    _tagsController = TextEditingController(text: (widget.article['tags'] as List<dynamic>?)?.join(', '));
     
-    // UBAH: Inisialisasi nilai untuk dropdown, bukan controller
     _selectedCategory = widget.article['category'];
-    // Validasi tambahan jika kategori dari data lama tidak ada di list baru
     if (!_categories.contains(_selectedCategory)) {
       _selectedCategory = null;
     }
@@ -59,8 +46,6 @@ class _EditArticlePageState extends State<EditArticlePage> {
   @override
   void dispose() {
     _titleController.dispose();
-    // HAPUS: dispose untuk _categoryController
-    // _categoryController.dispose();
     _contentController.dispose();
     _imageUrlController.dispose();
     _tagsController.dispose();
@@ -72,51 +57,49 @@ class _EditArticlePageState extends State<EditArticlePage> {
       return;
     }
 
-    setState(() {
-      _isLoading = true;
-    });
+    setState(() => _isLoading = true);
 
     try {
       final articleData = {
         'title': _titleController.text,
-        // UBAH: Gunakan nilai dari _selectedCategory
         'category': _selectedCategory, 
         'content': _contentController.text,
         'imageUrl': _imageUrlController.text,
-        'readTime': widget.article['readTime'] ?? '5 min', // Keep existing or default
-        'isTrending': widget.article['isTrending'] ?? false, // Keep existing value
+        'readTime': widget.article['readTime'] ?? '5 min',
+        'isTrending': widget.article['isTrending'] ?? false,
         'tags': _tagsController.text.split(',').map((e) => e.trim()).toList(),
       };
 
       await _newsService.updateArticle(widget.article['id'], articleData, widget.token);
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Article updated successfully!')),
-      );
-
-      Navigator.pop(context, true); // Go back to profile page with success status
+      if(mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Article updated successfully!')),
+        );
+        Navigator.pop(context, true);
+      }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to update article: $e')),
-      );
+      if(mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to update article: $e')),
+        );
+      }
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      if(mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    // Scaffold dan AppBar sekarang akan menggunakan warna dari tema global
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 1,
-        iconTheme: IconThemeData(color: Colors.black),
+        // Menghapus properti warna agar mengikuti tema global
         title: Text(
           'Edit Article',
           style: GoogleFonts.poppins(
-            color: Colors.black,
             fontWeight: FontWeight.w600,
           ),
         ),
@@ -142,10 +125,10 @@ class _EditArticlePageState extends State<EditArticlePage> {
                 },
               ),
               const SizedBox(height: 16),
-
-              // PERBAIKAN: Widget DropdownButtonFormField untuk Kategori
               DropdownButtonFormField<String>(
                 value: _selectedCategory,
+                // Mengatur warna dropdown menu agar sesuai tema
+                dropdownColor: Theme.of(context).cardColor,
                 decoration: InputDecoration(
                   labelText: 'Category',
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
@@ -229,19 +212,24 @@ class _EditArticlePageState extends State<EditArticlePage> {
                 child: ElevatedButton(
                   onPressed: _isLoading ? null : _submitArticleUpdate,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Color(0xFF6B73FF),
+                    // Menggunakan warna primer dari tema
+                    backgroundColor: Theme.of(context).primaryColor,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(8),
                     ),
                   ),
                   child: _isLoading
-                      ? const CircularProgressIndicator(color: Colors.white)
+                      ? CircularProgressIndicator(
+                          // Menggunakan warna yang kontras dengan warna tombol
+                          valueColor: AlwaysStoppedAnimation<Color>(Theme.of(context).colorScheme.onPrimary),
+                        )
                       : Text(
                           'Update Article',
                           style: GoogleFonts.poppins(
                             fontSize: 16,
                             fontWeight: FontWeight.w600,
-                            color: Colors.white,
+                            // Menggunakan warna yang kontras dengan warna tombol
+                            color: Theme.of(context).colorScheme.onPrimary,
                           ),
                         ),
                 ),

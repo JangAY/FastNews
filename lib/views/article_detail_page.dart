@@ -44,34 +44,62 @@ class _ArticleDetailPageState extends State<ArticleDetailPage> {
     try {
       if (currentStatus) {
         await _bookmarkService.removeBookmark(widget.article['id'], widget.token);
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Removed from bookmarks')));
+        if(mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Removed from bookmarks')));
       } else {
         await _bookmarkService.saveBookmark(widget.article['id'], widget.token);
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Added to bookmarks')));
+        if(mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Added to bookmarks')));
       }
     } catch (e) {
       // Revert on failure
       setState(() {
         _isBookmarked = currentStatus;
       });
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to update bookmark')));
+      if(mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to update bookmark')));
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    // Scaffold sekarang akan menggunakan warna dari tema global
     return Scaffold(
-      backgroundColor: Colors.white,
       body: CustomScrollView(
         slivers: [
           SliverAppBar(
+            stretch: true,
             expandedHeight: 300,
             pinned: true,
+            // Membuat AppBar transparan agar gradien terlihat
+            backgroundColor: Colors.transparent, 
+            // Memastikan ikon (back, bookmark, share) berwarna putih agar kontras
+            foregroundColor: Colors.white, 
             flexibleSpace: FlexibleSpaceBar(
-              background: Image.network(
-                widget.article['imageUrl'] ?? 'https://via.placeholder.com/150',
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) => Container(color: Colors.grey),
+              background: Stack(
+                fit: StackFit.expand,
+                children: [
+                  Image.network(
+                    widget.article['imageUrl'] ?? 'https://via.placeholder.com/150',
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) => Container(
+                      // Menggunakan warna adaptif untuk placeholder gambar
+                      color: Theme.of(context).dividerColor,
+                      child: Icon(Icons.image_not_supported, color: Theme.of(context).iconTheme.color?.withOpacity(0.5)),
+                    ),
+                  ),
+                  // Menambahkan lapisan gradien gelap untuk meningkatkan kontras ikon AppBar
+                  const DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.black54,
+                          Colors.transparent,
+                        ],
+                        stops: [0.0, 0.4],
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
             actions: [
@@ -94,7 +122,8 @@ class _ArticleDetailPageState extends State<ArticleDetailPage> {
                   Text(
                     widget.article['category'] ?? 'General',
                     style: GoogleFonts.poppins(
-                      color: Color(0xFF6B73FF),
+                      // Menggunakan warna primer dari tema
+                      color: Theme.of(context).primaryColor,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
@@ -119,7 +148,10 @@ class _ArticleDetailPageState extends State<ArticleDetailPage> {
                           ),
                           Text(
                             widget.article['publishedAt'] ?? 'Unknown date',
-                            style: GoogleFonts.poppins(color: Colors.grey[600]),
+                            style: GoogleFonts.poppins(
+                              // Menggunakan warna teks sekunder dari tema
+                              color: Theme.of(context).textTheme.bodySmall?.color
+                            ),
                           ),
                         ],
                       ),

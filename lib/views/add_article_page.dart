@@ -13,24 +13,14 @@ class AddArticlePage extends StatefulWidget {
 class _AddArticlePageState extends State<AddArticlePage> {
   final _formKey = GlobalKey<FormState>();
   final _titleController = TextEditingController();
-  // HAPUS: _categoryController tidak diperlukan lagi
-  // final _categoryController = TextEditingController(); 
   final _contentController = TextEditingController();
   final _imageUrlController = TextEditingController();
   final _tagsController = TextEditingController();
 
-  // Variabel untuk menyimpan nilai dropdown yang dipilih
   String? _selectedCategory;
 
-  // Daftar kategori yang akan ditampilkan di dropdown
   final List<String> _categories = [
-    'Technology',
-    'Sports',
-    'Health',
-    'Business',
-    'Entertainment',
-    'Politics',
-    'Science'
+    'Technology', 'Sports', 'Health', 'Business', 'Entertainment', 'Politics', 'Science'
   ];
 
   final NewsService _newsService = NewsService();
@@ -39,8 +29,6 @@ class _AddArticlePageState extends State<AddArticlePage> {
   @override
   void dispose() {
     _titleController.dispose();
-    // HAPUS: dispose untuk _categoryController
-    // _categoryController.dispose(); 
     _contentController.dispose();
     _imageUrlController.dispose();
     _tagsController.dispose();
@@ -48,7 +36,6 @@ class _AddArticlePageState extends State<AddArticlePage> {
   }
 
   Future<void> _submitArticle() async {
-    // Validasi form
     if (!_formKey.currentState!.validate()) {
       return;
     }
@@ -58,51 +45,49 @@ class _AddArticlePageState extends State<AddArticlePage> {
     });
 
     try {
-      // Siapkan data artikel dari controller
       final articleData = {
         'title': _titleController.text,
-        // UBAH: Gunakan nilai dari _selectedCategory
         'category': _selectedCategory, 
         'content': _contentController.text,
         'imageUrl': _imageUrlController.text,
-        // API membutuhkan field ini, kita berikan nilai default
         'readTime': '5 min',
         'isTrending': false,
         'tags': _tagsController.text.split(',').map((e) => e.trim()).toList(),
       };
 
-      // Panggil service untuk membuat artikel
       await _newsService.createArticle(articleData, widget.token);
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Article created successfully!')),
-      );
-
-      // Kembali ke halaman sebelumnya (profile page)
-      Navigator.pop(context, true); // Kirim 'true' untuk refresh di profile page
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Article created successfully!')),
+        );
+        Navigator.pop(context, true);
+      }
 
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to create article: $e')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to create article: $e')),
+        );
+      }
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    // Scaffold dan AppBar sekarang akan menggunakan warna dari tema global
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 1,
-        iconTheme: IconThemeData(color: Colors.black),
+        // Menghapus properti warna agar mengikuti tema
         title: Text(
           'Add New Article',
           style: GoogleFonts.poppins(
-            color: Colors.black,
             fontWeight: FontWeight.w600,
           ),
         ),
@@ -114,7 +99,6 @@ class _AddArticlePageState extends State<AddArticlePage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Title Field
               TextFormField(
                 controller: _titleController,
                 decoration: InputDecoration(
@@ -130,9 +114,10 @@ class _AddArticlePageState extends State<AddArticlePage> {
               ),
               const SizedBox(height: 16),
 
-              // PERBAIKAN: Widget DropdownButtonFormField untuk Kategori
               DropdownButtonFormField<String>(
                 value: _selectedCategory,
+                // Mengatur warna dropdown menu agar sesuai tema
+                dropdownColor: Theme.of(context).cardColor,
                 decoration: InputDecoration(
                   labelText: 'Category',
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
@@ -158,7 +143,6 @@ class _AddArticlePageState extends State<AddArticlePage> {
               ),
               const SizedBox(height: 16),
               
-              // Image URL Field
               TextFormField(
                 controller: _imageUrlController,
                 keyboardType: TextInputType.url,
@@ -179,7 +163,6 @@ class _AddArticlePageState extends State<AddArticlePage> {
               ),
               const SizedBox(height: 16),
               
-              // Tags Field
               TextFormField(
                 controller: _tagsController,
                 decoration: InputDecoration(
@@ -196,7 +179,6 @@ class _AddArticlePageState extends State<AddArticlePage> {
               ),
               const SizedBox(height: 16),
 
-              // Content Field
               TextFormField(
                 controller: _contentController,
                 decoration: InputDecoration(
@@ -214,25 +196,29 @@ class _AddArticlePageState extends State<AddArticlePage> {
               ),
               const SizedBox(height: 32),
 
-              // Submit Button
               SizedBox(
                 height: 50,
                 child: ElevatedButton(
                   onPressed: _isLoading ? null : _submitArticle,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Color(0xFF6B73FF),
+                    // Menggunakan warna primer dari tema
+                    backgroundColor: Theme.of(context).primaryColor,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(8),
                     ),
                   ),
                   child: _isLoading
-                      ? const CircularProgressIndicator(color: Colors.white)
+                      ? CircularProgressIndicator(
+                          // Menggunakan warna yang kontras dengan warna tombol
+                          valueColor: AlwaysStoppedAnimation<Color>(Theme.of(context).colorScheme.onPrimary),
+                        )
                       : Text(
                           'Submit Article',
                           style: GoogleFonts.poppins(
                             fontSize: 16,
                             fontWeight: FontWeight.w600,
-                            color: Colors.white,
+                            // Menggunakan warna yang kontras dengan warna tombol
+                            color: Theme.of(context).colorScheme.onPrimary,
                           ),
                         ),
                 ),

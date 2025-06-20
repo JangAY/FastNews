@@ -38,8 +38,8 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
+    // Scaffold sekarang akan menggunakan warna dari tema global
     return Scaffold(
-      backgroundColor: Colors.white,
       body: _widgetOptions.elementAt(_selectedIndex),
       bottomNavigationBar: BottomNavigationBar(
         items: const <BottomNavigationBarItem>[
@@ -55,8 +55,10 @@ class _HomePageState extends State<HomePage> {
           ),
         ],
         currentIndex: _selectedIndex,
-        selectedItemColor: Color(0xFF6B73FF),
-        unselectedItemColor: Colors.grey,
+        // Menggunakan warna dari tema untuk item yang dipilih
+        selectedItemColor: Theme.of(context).primaryColor, 
+        // Menggunakan warna yang lebih kontras di mode gelap
+        unselectedItemColor: Theme.of(context).textTheme.bodySmall?.color?.withOpacity(0.7),
         onTap: _onItemTapped,
         type: BottomNavigationBarType.fixed,
         selectedLabelStyle: GoogleFonts.poppins(
@@ -109,14 +111,18 @@ class __HomePageContentState extends State<_HomePageContent> {
   Future<void> _loadInitialArticles() async {
     try {
       final response = await _newsService.fetchArticles(page: 1);
-      setState(() {
-        _allArticles = response['data']['articles'];
-        _applyCategoryFilter(_selectedCategory);
-      });
+      if(mounted){
+        setState(() {
+          _allArticles = response['data']['articles'];
+          _applyCategoryFilter(_selectedCategory);
+        });
+      }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to load articles: $e')),
-      );
+      if(mounted){
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to load articles: $e')),
+        );
+      }
     }
   }
 
@@ -126,9 +132,11 @@ class __HomePageContentState extends State<_HomePageContent> {
       _currentPage = 1;
     });
     await _loadInitialArticles();
-    setState(() {
-      _isRefreshing = false;
-    });
+    if(mounted){
+      setState(() {
+        _isRefreshing = false;
+      });
+    }
   }
 
   void _scrollListener() {
@@ -144,14 +152,18 @@ class __HomePageContentState extends State<_HomePageContent> {
     _currentPage++;
     try {
       final response = await _newsService.fetchArticles(page: _currentPage, category: _selectedCategory == 'All' ? null : _selectedCategory);
-      setState(() {
-        _allArticles.addAll(response['data']['articles']);
-        _applyCategoryFilter(_selectedCategory);
-      });
+      if(mounted){
+        setState(() {
+          _allArticles.addAll(response['data']['articles']);
+          _applyCategoryFilter(_selectedCategory);
+        });
+      }
     } catch (e) {
       // Handle error
     } finally {
-      setState(() => _isLoadingMore = false);
+      if(mounted){
+        setState(() => _isLoadingMore = false);
+      }
     }
   }
   
@@ -174,14 +186,14 @@ class __HomePageContentState extends State<_HomePageContent> {
 
       if (isBookmarked) {
         await _bookmarkService.removeBookmark(article['id'], widget.token);
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Bookmark removed')));
+        if(mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Bookmark removed')));
       } else {
         await _bookmarkService.saveBookmark(article['id'], widget.token);
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Article bookmarked')));
+        if(mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Article bookmarked')));
       }
       setState(() {}); // Rebuild to update bookmark icon
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed: ${e.toString()}')));
+      if(mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed: ${e.toString()}')));
     }
   }
 
@@ -196,27 +208,29 @@ class __HomePageContentState extends State<_HomePageContent> {
 
   @override
   Widget build(BuildContext context) {
+    final bool isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
     return RefreshIndicator(
       onRefresh: _refreshArticles,
       child: CustomScrollView(
         controller: _scrollController,
         slivers: [
+          // AppBar akan mengikuti tema dari main.dart
           SliverAppBar(
             floating: true,
             snap: true,
-            backgroundColor: Colors.white,
-            elevation: 0,
             title: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 SizedBox(height: 20),
                 Text(
                   'FastNews',
-                  style: GoogleFonts.poppins(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.black87),
+                  style: GoogleFonts.poppins(fontSize: 32, fontWeight: FontWeight.bold),
                 ),
                 Text(
                   'Kabar Terkini, Dari Kami untuk Negeri',
-                  style: GoogleFonts.poppins(fontSize: 14, color: Colors.grey[600]),
+                  // Menggunakan warna teks sekunder dari tema
+                  style: GoogleFonts.poppins(fontSize: 14, color: Theme.of(context).textTheme.bodySmall?.color),
                 ),
               ],
             ),
@@ -243,7 +257,7 @@ class __HomePageContentState extends State<_HomePageContent> {
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return Center(child: CircularProgressIndicator());
-                  } else if (snapshot.hasError || !snapshot.hasData || snapshot.data!['data']['articles'].isEmpty) {
+                  } else if (snapshot.hasError || !snapshot.hasData || (snapshot.data!['data']?['articles'] as List?)?.isEmpty != false) {
                     return Center(child: Text('No trending articles'));
                   }
                   final articles = snapshot.data!['data']['articles'] as List;
@@ -271,7 +285,7 @@ class __HomePageContentState extends State<_HomePageContent> {
           ),
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.all(24.0),
+              padding: const EdgeInsets.fromLTRB(24.0, 24.0, 24.0, 0), // Mengurangi padding bawah
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -284,15 +298,20 @@ class __HomePageContentState extends State<_HomePageContent> {
                       itemCount: _categories.length,
                       itemBuilder: (context, index) {
                         final category = _categories[index];
+                        final isSelected = _selectedCategory == category;
                         return Padding(
                           padding: const EdgeInsets.only(right: 8.0),
                           child: FilterChip(
                             label: Text(category),
-                            selected: _selectedCategory == category,
+                            selected: isSelected,
                             onSelected: (selected) => _applyCategoryFilter(category),
-                            selectedColor: Color(0xFF6B73FF),
+                            // Warna adaptif untuk FilterChip
+                            selectedColor: Theme.of(context).primaryColor,
+                            backgroundColor: isDarkMode ? Colors.grey[800] : Colors.grey[200],
                             labelStyle: GoogleFonts.poppins(
-                              color: _selectedCategory == category ? Colors.white : Colors.black87,
+                              color: isSelected 
+                                ? Colors.white 
+                                : Theme.of(context).textTheme.bodyLarge?.color,
                             ),
                           ),
                         );
@@ -404,7 +423,8 @@ class _TrendingNewsCardState extends State<_TrendingNewsCard> {
                 children: [
                   Text(
                     widget.article['category'] ?? 'General',
-                    style: GoogleFonts.poppins(color: Color(0xFF6B73FF), fontWeight: FontWeight.w500),
+                    // Gunakan warna dari tema
+                    style: GoogleFonts.poppins(color: Theme.of(context).primaryColor, fontWeight: FontWeight.w500),
                   ),
                   const SizedBox(height: 8),
                   Text(
@@ -500,8 +520,12 @@ class _LatestNewsItemState extends State<_LatestNewsItem> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    widget.article['content']?.substring(0, 100) ?? 'No description',
-                    style: GoogleFonts.poppins(color: Colors.grey[600]),
+                    // Membatasi panjang konten agar tidak error
+                    (widget.article['content'] as String? ?? 'No description').length > 100 
+                      ? (widget.article['content'] as String).substring(0, 100) + '...'
+                      : widget.article['content'] ?? 'No description',
+                    // Menggunakan warna teks sekunder dari tema
+                    style: GoogleFonts.poppins(color: Theme.of(context).textTheme.bodySmall?.color),
                   ),
                   const SizedBox(height: 8),
                   Row(
@@ -519,7 +543,7 @@ class _LatestNewsItemState extends State<_LatestNewsItem> {
                       ),
                        Text(
                         widget.article['publishedAt'] ?? 'Unknown date',
-                        style: GoogleFonts.poppins(color: Colors.grey[500]),
+                        style: GoogleFonts.poppins(color: Theme.of(context).textTheme.bodySmall?.color),
                       ),
                     ],
                   ),

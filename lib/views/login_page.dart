@@ -24,6 +24,7 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   Future<void> _handleSignIn() async {
+    // Fungsi ini tidak perlu diubah
     final String email = _emailController.text.trim();
     final String password = _passwordController.text.trim();
 
@@ -42,6 +43,7 @@ class _LoginPageState extends State<LoginPage> {
         password: password,
       );
 
+      if(!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Sign in successful')),
       );
@@ -55,18 +57,22 @@ class _LoginPageState extends State<LoginPage> {
         ),
       );
     } catch (e) {
+      if(!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Sign in failed: ${e.toString()}')),
       );
     } finally {
-      setState(() => _isLoading = false);
+      if(mounted){
+        setState(() => _isLoading = false);
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Color(0xFF6B73FF),
+      // Menggunakan warna primer dari tema untuk latar belakang
+      backgroundColor: Theme.of(context).primaryColor,
       body: SafeArea(
         child: Column(
           children: [
@@ -77,6 +83,7 @@ class _LoginPageState extends State<LoginPage> {
               child: Text(
                 'Sign-In',
                 style: GoogleFonts.poppins(
+                  // Warna putih cocok untuk latar belakang primer
                   color: Colors.white,
                   fontSize: 16,
                   fontWeight: FontWeight.w500,
@@ -89,7 +96,8 @@ class _LoginPageState extends State<LoginPage> {
               child: Container(
                 width: double.infinity,
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  // Menggunakan warna kartu dari tema (putih di mode terang, gelap di mode gelap)
+                  color: Theme.of(context).cardColor,
                   borderRadius: BorderRadius.only(
                     topLeft: Radius.circular(24),
                     topRight: Radius.circular(24),
@@ -114,14 +122,16 @@ class _LoginPageState extends State<LoginPage> {
                           'Get the most out of the app, sign in and explore a world of news',
                           style: GoogleFonts.poppins(
                             fontSize: 14,
-                            color: Colors.grey[600],
+                            // Menggunakan warna teks sekunder dari tema
+                            color: Theme.of(context).textTheme.bodySmall?.color,
                           ),
                         ),
                         SizedBox(height: 32),
                         // Email Field
                         Container(
                           decoration: BoxDecoration(
-                            border: Border.all(color: Colors.grey[300]!),
+                            // Menggunakan warna pembatas dari tema
+                            border: Border.all(color: Theme.of(context).dividerColor),
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: TextField(
@@ -129,7 +139,7 @@ class _LoginPageState extends State<LoginPage> {
                             keyboardType: TextInputType.emailAddress,
                             decoration: InputDecoration(
                               hintText: 'Email',
-                              prefixIcon: Icon(Icons.email_outlined),
+                              prefixIcon: Icon(Icons.email_outlined, color: Theme.of(context).iconTheme.color),
                               border: InputBorder.none,
                               contentPadding: EdgeInsets.all(16),
                             ),
@@ -139,7 +149,7 @@ class _LoginPageState extends State<LoginPage> {
                         // Password Field
                         Container(
                           decoration: BoxDecoration(
-                            border: Border.all(color: Colors.grey[300]!),
+                            border: Border.all(color: Theme.of(context).dividerColor),
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: TextField(
@@ -147,12 +157,13 @@ class _LoginPageState extends State<LoginPage> {
                             obscureText: !_isPasswordVisible,
                             decoration: InputDecoration(
                               hintText: 'Password',
-                              prefixIcon: Icon(Icons.lock_outline),
+                              prefixIcon: Icon(Icons.lock_outline, color: Theme.of(context).iconTheme.color),
                               suffixIcon: IconButton(
                                 icon: Icon(
                                   _isPasswordVisible
                                       ? Icons.visibility
                                       : Icons.visibility_off,
+                                  color: Theme.of(context).iconTheme.color,
                                 ),
                                 onPressed: () {
                                   setState(() {
@@ -173,17 +184,21 @@ class _LoginPageState extends State<LoginPage> {
                           child: ElevatedButton(
                             onPressed: _isLoading ? null : _handleSignIn,
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: Color(0xFF00BFFF),
+                              // Menggunakan warna sekunder dari tema
+                              backgroundColor: Theme.of(context).colorScheme.secondary,
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(8),
                               ),
                             ),
                             child: _isLoading
-                                ? CircularProgressIndicator(color: Colors.white)
+                                ? CircularProgressIndicator(
+                                    valueColor: AlwaysStoppedAnimation<Color>(Theme.of(context).colorScheme.onSecondary),
+                                  )
                                 : Text(
                                     'Sign In',
                                     style: GoogleFonts.poppins(
-                                      color: Colors.white,
+                                      // Menggunakan warna teks yang kontras dengan warna sekunder
+                                      color: Theme.of(context).colorScheme.onSecondary,
                                       fontSize: 16,
                                       fontWeight: FontWeight.w600,
                                     ),
@@ -210,7 +225,8 @@ class _LoginPageState extends State<LoginPage> {
                               child: Text(
                                 'Sign up',
                                 style: GoogleFonts.poppins(
-                                  color: Color(0xFF6B73FF),
+                                  // Menggunakan warna primer dari tema
+                                  color: Theme.of(context).primaryColor,
                                   fontWeight: FontWeight.w600,
                                 ),
                               ),

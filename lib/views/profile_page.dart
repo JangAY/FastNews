@@ -4,7 +4,10 @@ import 'package:fastnews/views/login_page.dart';
 import 'package:fastnews/services/news_service.dart';
 import 'package:fastnews/services/auth_service.dart';
 import 'add_article_page.dart';
-import 'edit_article_page.dart'; // Import the new edit page
+import 'edit_article_page.dart';
+// Impor untuk manajemen tema
+import 'package:provider/provider.dart';
+import '../services/theme_provider.dart';
 
 class ProfilePage extends StatefulWidget {
   final String token;
@@ -48,40 +51,37 @@ class _ProfilePageState extends State<ProfilePage> {
   }
   
   void _navigateAndRefreshAdd() {
-    // Navigasi ke halaman tambah artikel
     Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => AddArticlePage(token: widget.token)),
     ).then((_) {
-      // Blok ini akan berjalan ketika kita kembali dari AddArticlePage.
-      // Cukup panggil setState untuk memicu FutureBuilder membangun ulang.
       setState(() {});
     });
   }
 
   void _navigateAndRefreshEdit(Map<String, dynamic> article) {
-    // Navigasi ke halaman edit artikel
     Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => EditArticlePage(token: widget.token, article: article)),
     ).then((_) {
-      // Refresh list after returning from edit page
       setState(() {});
     });
   }
 
   @override
   Widget build(BuildContext context) {
+    // Akses theme provider
+    final themeProvider = Provider.of<ThemeProvider>(context);
+
     return Scaffold(
+      // AppBar sekarang akan mengikuti tema dari main.dart
       appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
         automaticallyImplyLeading: false,
-        title: Text('Profile', style: GoogleFonts.poppins(color: Colors.black, fontWeight: FontWeight.w600)),
+        title: Text('Profile', style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
         centerTitle: true,
         actions: [
           IconButton(
-            icon: const Icon(Icons.add_circle_outline, color: Colors.black),
+            icon: const Icon(Icons.add_circle_outline),
             onPressed: _navigateAndRefreshAdd,
           ),
         ],
@@ -132,16 +132,17 @@ class _ProfilePageState extends State<ProfilePage> {
                     itemBuilder: (context, index) {
                       final article = articles[index];
                       return Card(
+                        // Card akan otomatis menyesuaikan warna dengan tema
                         margin: EdgeInsets.only(bottom: 16),
                         child: ListTile(
                           title: Text(article['title'], style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
                           subtitle: Text(article['category'], style: GoogleFonts.poppins()),
-                          trailing: Row( // Use a Row for multiple actions
-                            mainAxisSize: MainAxisSize.min, // Important to prevent overflow
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
                             children: [
                               IconButton(
-                                icon: Icon(Icons.edit, color: Colors.blue[400]), // Edit icon
-                                onPressed: () => _navigateAndRefreshEdit(article), // Navigate to edit page
+                                icon: Icon(Icons.edit, color: Theme.of(context).colorScheme.secondary),
+                                onPressed: () => _navigateAndRefreshEdit(article),
                               ),
                               IconButton(
                                 icon: Icon(Icons.delete, color: Colors.red[400]),
@@ -178,13 +179,36 @@ class _ProfilePageState extends State<ProfilePage> {
                 },
               ),
             ),
-             const SizedBox(height: 16),
+            const SizedBox(height: 16),
+
+            // OPSI UNTUK MENGUBAH TEMA
+            Card(
+              margin: const EdgeInsets.only(bottom: 16.0),
+              child: SwitchListTile(
+                title: Text(
+                  'Dark Mode',
+                  style: GoogleFonts.poppins(),
+                ),
+                value: themeProvider.isDarkMode,
+                onChanged: (value) {
+                  themeProvider.setDarkTheme(value);
+                },
+                secondary: Icon(
+                  themeProvider.isDarkMode ? Icons.nightlight_round : Icons.wb_sunny,
+                  color: Theme.of(context).colorScheme.secondary,
+                ),
+              ),
+            ),
+            
             SizedBox(
               width: double.infinity,
               height: 50,
               child: ElevatedButton(
                 onPressed: _handleLogout,
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.red[400], shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red[400], 
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))
+                ),
                 child: Text(
                   'Log Out',
                   style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.white),
