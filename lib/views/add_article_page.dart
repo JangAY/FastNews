@@ -13,10 +13,25 @@ class AddArticlePage extends StatefulWidget {
 class _AddArticlePageState extends State<AddArticlePage> {
   final _formKey = GlobalKey<FormState>();
   final _titleController = TextEditingController();
-  final _categoryController = TextEditingController();
+  // HAPUS: _categoryController tidak diperlukan lagi
+  // final _categoryController = TextEditingController(); 
   final _contentController = TextEditingController();
   final _imageUrlController = TextEditingController();
   final _tagsController = TextEditingController();
+
+  // Variabel untuk menyimpan nilai dropdown yang dipilih
+  String? _selectedCategory;
+
+  // Daftar kategori yang akan ditampilkan di dropdown
+  final List<String> _categories = [
+    'Technology',
+    'Sports',
+    'Health',
+    'Business',
+    'Entertainment',
+    'Politics',
+    'Science'
+  ];
 
   final NewsService _newsService = NewsService();
   bool _isLoading = false;
@@ -24,7 +39,8 @@ class _AddArticlePageState extends State<AddArticlePage> {
   @override
   void dispose() {
     _titleController.dispose();
-    _categoryController.dispose();
+    // HAPUS: dispose untuk _categoryController
+    // _categoryController.dispose(); 
     _contentController.dispose();
     _imageUrlController.dispose();
     _tagsController.dispose();
@@ -45,11 +61,12 @@ class _AddArticlePageState extends State<AddArticlePage> {
       // Siapkan data artikel dari controller
       final articleData = {
         'title': _titleController.text,
-        'category': _categoryController.text,
+        // UBAH: Gunakan nilai dari _selectedCategory
+        'category': _selectedCategory, 
         'content': _contentController.text,
         'imageUrl': _imageUrlController.text,
         // API membutuhkan field ini, kita berikan nilai default
-        'readTime': '5 min', 
+        'readTime': '5 min',
         'isTrending': false,
         'tags': _tagsController.text.split(',').map((e) => e.trim()).toList(),
       };
@@ -62,7 +79,7 @@ class _AddArticlePageState extends State<AddArticlePage> {
       );
 
       // Kembali ke halaman sebelumnya (profile page)
-      Navigator.pop(context);
+      Navigator.pop(context, true); // Kirim 'true' untuk refresh di profile page
 
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -113,17 +130,28 @@ class _AddArticlePageState extends State<AddArticlePage> {
               ),
               const SizedBox(height: 16),
 
-              // Category Field
-              TextFormField(
-                controller: _categoryController,
+              // PERBAIKAN: Widget DropdownButtonFormField untuk Kategori
+              DropdownButtonFormField<String>(
+                value: _selectedCategory,
                 decoration: InputDecoration(
                   labelText: 'Category',
-                  hintText: 'e.g., Technology, Sports',
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                 ),
+                hint: Text('Select a category'),
+                items: _categories.map((String category) {
+                  return DropdownMenuItem<String>(
+                    value: category,
+                    child: Text(category),
+                  );
+                }).toList(),
+                onChanged: (String? newValue) {
+                  setState(() {
+                    _selectedCategory = newValue;
+                  });
+                },
                 validator: (value) {
                   if (value == null || value.isEmpty) {
-                    return 'Please enter a category';
+                    return 'Please select a category';
                   }
                   return null;
                 },
