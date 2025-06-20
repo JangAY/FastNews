@@ -1,12 +1,16 @@
-// TODO Implement this library.
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 class NewsService {
   static const String baseUrl = 'https://rest-api-berita.vercel.app/api/v1';
 
+  // --- Public Endpoints ---
   Future<Map<String, dynamic>> fetchArticles({int page = 1, int limit = 10, String? category}) async {
-    final url = Uri.parse('$baseUrl/news?page=$page&limit=$limit${category != null ? '&category=$category' : ''}');
+    String urlString = '$baseUrl/news?page=$page&limit=$limit';
+    if (category != null && category.toLowerCase() != 'all') {
+      urlString += '&category=$category';
+    }
+    final url = Uri.parse(urlString);
     final response = await http.get(url);
 
     if (response.statusCode == 200) {
@@ -27,6 +31,7 @@ class NewsService {
     }
   }
 
+  // --- Protected Endpoints ---
   Future<Map<String, dynamic>> createArticle(Map<String, dynamic> articleData, String token) async {
     final url = Uri.parse('$baseUrl/news');
     final response = await http.post(
@@ -37,11 +42,11 @@ class NewsService {
       },
       body: json.encode(articleData),
     );
-
+    
     if (response.statusCode == 201) {
       return json.decode(response.body);
     } else {
-      throw Exception('Failed to create article');
+      throw Exception('Failed to create article: ${response.body}');
     }
   }
 
@@ -67,9 +72,7 @@ class NewsService {
     final url = Uri.parse('$baseUrl/news/$id');
     final response = await http.delete(
       url,
-      headers: {
-        'Authorization': 'Bearer $token',
-      },
+      headers: {'Authorization': 'Bearer $token'},
     );
 
     return response.statusCode == 200;
@@ -79,9 +82,7 @@ class NewsService {
     final url = Uri.parse('$baseUrl/news/user/me');
     final response = await http.get(
       url,
-      headers: {
-        'Authorization': 'Bearer $token',
-      },
+      headers: {'Authorization': 'Bearer $token'},
     );
 
     if (response.statusCode == 200) {

@@ -1,20 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../services/bookmark_service.dart';
-import '../services/news_service.dart';
-import 'article_detail_page.dart'; // Asumsikan kita punya halaman detail
+import 'article_detail_page.dart';
 
 class BookmarksPage extends StatefulWidget {
-  const BookmarksPage({Key? key}) : super(key: key);
+  final String token;
+  const BookmarksPage({Key? key, required this.token}) : super(key: key);
 
   @override
   State<BookmarksPage> createState() => _BookmarksPageState();
 }
 
 class _BookmarksPageState extends State<BookmarksPage> {
-  late Future<List<Map<String, dynamic>>> _bookmarkedArticles;
-  final NewsService _newsService = NewsService();
-  bool _isLoading = false;
+  final BookmarkService _bookmarkService = BookmarkService();
+  late Future<List<dynamic>> _bookmarkedArticlesFuture;
 
   @override
   void initState() {
@@ -24,59 +23,17 @@ class _BookmarksPageState extends State<BookmarksPage> {
 
   void _loadBookmarks() {
     setState(() {
-      _bookmarkedArticles = BookmarkService.getBookmarks();
+      _bookmarkedArticlesFuture = _bookmarkService.getSavedArticles(widget.token);
     });
   }
 
-  Future<void> _refreshBookmarks() async {
-    setState(() {
-      _isLoading = true;
-    });
-    await Future.delayed(const Duration(milliseconds: 500));
-    _loadBookmarks();
-    setState(() {
-      _isLoading = false;
-    });
-  }
-
-  void _navigateToArticleDetail(Map<String, dynamic> article) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => ArticleDetailPage(article: article),
-      ),
-    );
-  }
-
-  Future<void> _confirmRemoveBookmark(String articleId) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Remove Bookmark', style: GoogleFonts.poppins()),
-        content: Text('Are you sure you want to remove this bookmark?', 
-                     style: GoogleFonts.poppins()),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: Text('Cancel', style: GoogleFonts.poppins()),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: Text('Remove', style: GoogleFonts.poppins(color: Colors.red)),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed == true) {
-      await BookmarkService.removeBookmark(articleId);
-      _refreshBookmarks();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Bookmark removed', style: GoogleFonts.poppins()),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+  Future<void> _removeBookmark(String articleId) async {
+    try {
+      await _bookmarkService.removeBookmark(articleId, widget.token);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Bookmark removed')));
+      _loadBookmarks(); // Refresh the list
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to remove bookmark')));
     }
   }
 
@@ -96,72 +53,42 @@ class _BookmarksPageState extends State<BookmarksPage> {
           ),
         ),
         centerTitle: true,
-        actions: [
-          IconButton(
-            icon: Icon(Icons.refresh, color: Colors.black),
-            onPressed: _refreshBookmarks,
-          ),
-        ],
       ),
-      body: _isLoading
-          ? Center(child: CircularProgressIndicator())
-          : RefreshIndicator(
-              onRefresh: _refreshBookmarks,
-              child: FutureBuilder<List<Map<String, dynamic>>>(
-                future: _bookmarkedArticles,
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return Center(child: CircularProgressIndicator());
-                  } else if (snapshot.hasError) {
-                    return Center(
-                      child: Text(
-                        'Error loading bookmarks',
-                        style: GoogleFonts.poppins(color: Colors.red),
-                      ),
-                    );
-                  } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                    return Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.bookmark_border, size: 64, color: Colors.grey[400]),
-                          SizedBox(height: 16),
-                          Text(
-                            'No bookmarks yet',
-                            style: GoogleFonts.poppins(
-                              fontSize: 16,
-                              color: Colors.grey[600],
-                            ),
-                          ),
-                          SizedBox(height: 8),
-                          Text(
-                            'Save articles to read later',
-                            style: GoogleFonts.poppins(
-                              fontSize: 14,
-                              color: Colors.grey[500],
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  }
+      body: FutureBuilder<List<dynamic>>(
+        future: _bookmarkedArticlesFuture,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return Center(child: CircularProgressIndicator());
+          } else if (snapshot.hasError) {
+            return Center(child: Text('Error: ${snapshot.error}'));
+          } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+            return Center(
+              child: Text('No bookmarks yet', style: GoogleFonts.poppins()),
+            );
+          }
 
-                  final bookmarks = snapshot.data!;
-                  return ListView.builder(
-                    padding: EdgeInsets.all(16),
-                    itemCount: bookmarks.length,
-                    itemBuilder: (context, index) {
-                      final article = bookmarks[index];
-                      return _BookmarkItem(
-                        article: article,
-                        onRemove: () => _confirmRemoveBookmark(article['articleId']),
-                        onTap: () => _navigateToArticleDetail(article),
-                      );
-                    },
-                  );
+          final bookmarks = snapshot.data!;
+          return ListView.builder(
+            padding: EdgeInsets.all(16),
+            itemCount: bookmarks.length,
+            itemBuilder: (context, index) {
+              final article = bookmarks[index];
+              return _BookmarkItem(
+                article: article,
+                onRemove: () => _removeBookmark(article['id']),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => ArticleDetailPage(article: article, token: widget.token),
+                    ),
+                  ).then((_) => _loadBookmarks());
                 },
-              ),
-            ),
+              );
+            },
+          );
+        },
+      ),
     );
   }
 }
@@ -171,11 +98,7 @@ class _BookmarkItem extends StatelessWidget {
   final VoidCallback onRemove;
   final VoidCallback onTap;
 
-  const _BookmarkItem({
-    required this.article,
-    required this.onRemove,
-    required this.onTap,
-  });
+  const _BookmarkItem({required this.article, required this.onRemove, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -183,79 +106,39 @@ class _BookmarkItem extends StatelessWidget {
       onTap: onTap,
       child: Card(
         margin: EdgeInsets.only(bottom: 16),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         elevation: 2,
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            ClipRRect(
-              borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
-              child: Image.network(
-                article['imageUrl'] ?? 'https://via.placeholder.com/150',
-                height: 180,
-                width: double.infinity,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) {
-                  return Container(
-                    height: 180,
-                    color: Colors.grey[200],
-                    child: Center(child: Icon(Icons.image, color: Colors.grey)),
-                  );
-                },
-              ),
+            Image.network(
+              article['imageUrl'] ?? 'https://via.placeholder.com/150',
+              height: 180,
+              width: double.infinity,
+              fit: BoxFit.cover,
             ),
             Padding(
               padding: EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  Text(
+                    article['title'] ?? 'No title',
+                    style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w600),
+                    maxLines: 2,
+                  ),
+                  SizedBox(height: 8),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
                         article['category'] ?? 'General',
-                        style: GoogleFonts.poppins(
-                          fontSize: 12,
-                          color: Color(0xFF6B73FF),
-                          fontWeight: FontWeight.w500,
-                        ),
+                        style: GoogleFonts.poppins(color: Color(0xFF6B73FF)),
                       ),
                       IconButton(
                         icon: Icon(Icons.bookmark, color: Colors.red),
                         onPressed: onRemove,
                       ),
                     ],
-                  ),
-                  SizedBox(height: 8),
-                  Text(
-                    article['title'] ?? 'No title',
-                    style: GoogleFonts.poppins(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.black87,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  SizedBox(height: 8),
-                  Text(
-                    article['date'] ?? 'Unknown date',
-                    style: GoogleFonts.poppins(
-                      fontSize: 12,
-                      color: Colors.grey[500],
-                    ),
-                  ),
-                  SizedBox(height: 12),
-                  Text(
-                    article['description'] ?? 'No description',
-                    style: GoogleFonts.poppins(
-                      fontSize: 14,
-                      color: Colors.grey[600],
-                    ),
-                    maxLines: 3,
-                    overflow: TextOverflow.ellipsis,
                   ),
                 ],
               ),

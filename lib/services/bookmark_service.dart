@@ -1,59 +1,61 @@
-import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
+import 'package:http/http.dart' as http;
 
 class BookmarkService {
-  static const String _bookmarksKey = 'saved_bookmarks';
+  static const String baseUrl = 'https://rest-api-berita.vercel.app/api/v1';
 
-  static Future<void> saveBookmark({
-    required String articleId,
-    required String title,
-    required String imageUrl,
-    required String category,
-    required String date,
-    required String description,
-  }) async {
-    final prefs = await SharedPreferences.getInstance();
-    final bookmarks = await getBookmarks();
-    
-    // Check if already bookmarked
-    if (!bookmarks.any((item) => item['articleId'] == articleId)) {
-      bookmarks.add({
-        'articleId': articleId,
-        'title': title,
-        'imageUrl': imageUrl,
-        'category': category,
-        'date': date,
-        'description': description,
-      });
-      await prefs.setString(_bookmarksKey, json.encode(bookmarks));
+  Future<void> saveBookmark(String articleId, String token) async {
+    final url = Uri.parse('$baseUrl/news/$articleId/bookmark');
+    final response = await http.post(
+      url,
+      headers: {'Authorization': 'Bearer $token'},
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception('Failed to save bookmark');
     }
   }
 
-  static Future<List<Map<String, dynamic>>> getBookmarks() async {
-    final prefs = await SharedPreferences.getInstance();
-    final bookmarksJson = prefs.getString(_bookmarksKey);
-    if (bookmarksJson != null) {
-      final List<dynamic> decoded = json.decode(bookmarksJson);
-      return decoded.map((item) => Map<String, dynamic>.from(item)).toList();
+  Future<void> removeBookmark(String articleId, String token) async {
+    final url = Uri.parse('$baseUrl/news/$articleId/bookmark');
+    final response = await http.delete(
+      url,
+      headers: {'Authorization': 'Bearer $token'},
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception('Failed to remove bookmark');
     }
-    return [];
   }
 
-  static Future<void> removeBookmark(String articleId) async {
-    final prefs = await SharedPreferences.getInstance();
-    final bookmarks = await getBookmarks();
-    bookmarks.removeWhere((item) => item['articleId'] == articleId);
-    await prefs.setString(_bookmarksKey, json.encode(bookmarks));
+  Future<List<dynamic>> getSavedArticles(String token) async {
+    final url = Uri.parse('$baseUrl/news/bookmarks/list');
+    final response = await http.get(
+      url,
+      headers: {'Authorization': 'Bearer $token'},
+    );
+
+    if (response.statusCode == 200) {
+      final body = json.decode(response.body);
+      return body['data']['articles'];
+    } else {
+      throw Exception('Failed to get saved articles');
+    }
   }
 
-  static Future<bool> isArticleBookmarked(String articleId) async {
-    final prefs = await SharedPreferences.getInstance();
-    final bookmarksJson = prefs.getString(_bookmarksKey);
-    if (bookmarksJson != null) {
-      final List<dynamic> decoded = json.decode(bookmarksJson);
-      return decoded.any((item) => item['articleId'] == articleId);
+  Future<bool> isArticleBookmarked(String articleId, String token) async {
+    final url = Uri.parse('$baseUrl/news/$articleId/bookmark');
+    final response = await http.get(
+      url,
+      headers: {'Authorization': 'Bearer $token'},
+    );
+
+    if (response.statusCode == 200) {
+      final body = json.decode(response.body);
+      return body['data']['isSaved'] ?? false;
+    } else {
+      // Jika artikel tidak ditemukan atau error lain, anggap tidak di-bookmark
+      return false;
     }
-    return false;
   }
 }
-

@@ -5,10 +5,11 @@ import '../services/bookmark_service.dart';
 import 'search_page.dart';
 import 'bookmarks_page.dart';
 import 'profile_page.dart';
-import 'article_detail_page.dart'; // Asumsikan kita punya halaman detail
+import 'article_detail_page.dart';
 
 class HomePage extends StatefulWidget {
-  const HomePage({super.key});
+  final String token;
+  const HomePage({super.key, required this.token});
 
   @override
   State<HomePage> createState() => _HomePageState();
@@ -16,14 +17,18 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   int _selectedIndex = 0;
-  final NewsService _newsService = NewsService();
+  late final List<Widget> _widgetOptions;
 
-  final List<Widget> _widgetOptions = <Widget>[
-    _HomePageContent(),
-    SearchPage(),
-    BookmarksPage(),
-    ProfilePage(),
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _widgetOptions = <Widget>[
+      _HomePageContent(token: widget.token),
+      SearchPage(),
+      BookmarksPage(token: widget.token),
+      ProfilePage(token: widget.token),
+    ];
+  }
 
   void _onItemTapped(int index) {
     setState(() {
@@ -37,7 +42,7 @@ class _HomePageState extends State<HomePage> {
       backgroundColor: Colors.white,
       body: _widgetOptions.elementAt(_selectedIndex),
       bottomNavigationBar: BottomNavigationBar(
-        items: <BottomNavigationBarItem>[
+        items: const <BottomNavigationBarItem>[
           BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
           BottomNavigationBarItem(icon: Icon(Icons.search), label: 'Search'),
           BottomNavigationBarItem(
@@ -65,12 +70,15 @@ class _HomePageState extends State<HomePage> {
 }
 
 class _HomePageContent extends StatefulWidget {
+  final String token;
+  const _HomePageContent({required this.token});
   @override
   __HomePageContentState createState() => __HomePageContentState();
 }
 
 class __HomePageContentState extends State<_HomePageContent> {
   final NewsService _newsService = NewsService();
+  final BookmarkService _bookmarkService = BookmarkService();
   late Future<Map<String, dynamic>> _trendingArticles;
   List<dynamic> _allArticles = [];
   List<dynamic> _filteredArticles = [];
@@ -81,14 +89,7 @@ class __HomePageContentState extends State<_HomePageContent> {
   String _selectedCategory = 'All';
 
   final List<String> _categories = [
-    'All',
-    'Technology',
-    'Business',
-    'Politics',
-    'Science',
-    'Health',
-    'Sports',
-    'Entertainment'
+    'All', 'Technology', 'Business', 'Politics', 'Science', 'Health', 'Sports', 'Entertainment'
   ];
 
   @override
@@ -107,17 +108,14 @@ class __HomePageContentState extends State<_HomePageContent> {
 
   Future<void> _loadInitialArticles() async {
     try {
-      final response = await _newsService.fetchArticles(page: _currentPage);
+      final response = await _newsService.fetchArticles(page: 1);
       setState(() {
         _allArticles = response['data']['articles'];
-        _filteredArticles = _allArticles;
+        _applyCategoryFilter(_selectedCategory);
       });
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to load articles: $e'),
-          behavior: SnackBarBehavior.floating,
-        ),
+        SnackBar(content: Text('Failed to load articles: $e')),
       );
     }
   }
@@ -127,62 +125,36 @@ class __HomePageContentState extends State<_HomePageContent> {
       _isRefreshing = true;
       _currentPage = 1;
     });
-    
-    try {
-      final response = await _newsService.fetchArticles(page: _currentPage);
-      setState(() {
-        _allArticles = response['data']['articles'];
-        _filteredArticles = _allArticles;
-        _isRefreshing = false;
-      });
-    } catch (e) {
-      setState(() {
-        _isRefreshing = false;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to refresh articles: $e'),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+    await _loadInitialArticles();
+    setState(() {
+      _isRefreshing = false;
+    });
+  }
+
+  void _scrollListener() {
+    if (_scrollController.position.pixels == _scrollController.position.maxScrollExtent) {
+      _loadMoreArticles();
     }
   }
 
   Future<void> _loadMoreArticles() async {
     if (_isLoadingMore) return;
-    
-    setState(() {
-      _isLoadingMore = true;
-    });
+    setState(() => _isLoadingMore = true);
 
+    _currentPage++;
     try {
-      _currentPage++;
-      final response = await _newsService.fetchArticles(page: _currentPage);
+      final response = await _newsService.fetchArticles(page: _currentPage, category: _selectedCategory == 'All' ? null : _selectedCategory);
       setState(() {
         _allArticles.addAll(response['data']['articles']);
         _applyCategoryFilter(_selectedCategory);
-        _isLoadingMore = false;
       });
     } catch (e) {
-      setState(() {
-        _isLoadingMore = false;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to load more articles: $e'),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      // Handle error
+    } finally {
+      setState(() => _isLoadingMore = false);
     }
   }
-
-  void _scrollListener() {
-    if (_scrollController.position.pixels == 
-        _scrollController.position.maxScrollExtent) {
-      _loadMoreArticles();
-    }
-  }
-
+  
   void _applyCategoryFilter(String category) {
     setState(() {
       _selectedCategory = category;
@@ -197,31 +169,19 @@ class __HomePageContentState extends State<_HomePageContent> {
   }
 
   Future<void> _toggleBookmark(Map<String, dynamic> article) async {
-    final isBookmarked = await BookmarkService.isArticleBookmarked(article['id']);
-    
-    if (isBookmarked) {
-      await BookmarkService.removeBookmark(article['id']);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Bookmark removed'),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-    } else {
-      await BookmarkService.saveBookmark(
-        articleId: article['id'],
-        title: article['title'],
-        imageUrl: article['imageUrl'],
-        category: article['category'],
-        date: article['publishedAt'],
-        description: article['content'] ?? article['description'] ?? '',
-      );
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Article bookmarked'),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+    try {
+      final isBookmarked = await _bookmarkService.isArticleBookmarked(article['id'], widget.token);
+
+      if (isBookmarked) {
+        await _bookmarkService.removeBookmark(article['id'], widget.token);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Bookmark removed')));
+      } else {
+        await _bookmarkService.saveBookmark(article['id'], widget.token);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Article bookmarked')));
+      }
+      setState(() {}); // Rebuild to update bookmark icon
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed: ${e.toString()}')));
     }
   }
 
@@ -229,278 +189,208 @@ class __HomePageContentState extends State<_HomePageContent> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => ArticleDetailPage(article: article),
+        builder: (context) => ArticleDetailPage(article: article, token: widget.token),
       ),
-    );
+    ).then((_) => setState((){})); // Refresh on return
   }
 
   @override
   Widget build(BuildContext context) {
     return RefreshIndicator(
       onRefresh: _refreshArticles,
-      child: SingleChildScrollView(
+      child: CustomScrollView(
         controller: _scrollController,
-        physics: AlwaysScrollableScrollPhysics(),
-        child: Padding(
-          padding: const EdgeInsets.only(top: 60.0, left: 24.0, right: 24.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'FastNews',
-                style: GoogleFonts.poppins(
-                  fontSize: 32,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black87,
+        slivers: [
+          SliverAppBar(
+            floating: true,
+            snap: true,
+            backgroundColor: Colors.white,
+            elevation: 0,
+            title: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(height: 20),
+                Text(
+                  'FastNews',
+                  style: GoogleFonts.poppins(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.black87),
                 ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'Kabar Terkini, Dari Kami untuk Negeri',
-                style: GoogleFonts.poppins(fontSize: 14, color: Colors.grey[600]),
-              ),
-              const SizedBox(height: 32),
-
-              // Trending News Section
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                Text(
+                  'Kabar Terkini, Dari Kami untuk Negeri',
+                  style: GoogleFonts.poppins(fontSize: 14, color: Colors.grey[600]),
+                ),
+              ],
+            ),
+            toolbarHeight: 100,
+          ),
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'Trending news',
-                    style: GoogleFonts.poppins(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.black87,
-                    ),
-                  ),
-                  TextButton(
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => BookmarksPage(),
+                  const SizedBox(height: 16),
+                  Text('Trending news', style: GoogleFonts.poppins(fontSize: 20, fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 16),
+                ],
+              ),
+            ),
+          ),
+          SliverToBoxAdapter(
+            child: SizedBox(
+              height: 280,
+              child: FutureBuilder<Map<String, dynamic>>(
+                future: _trendingArticles,
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return Center(child: CircularProgressIndicator());
+                  } else if (snapshot.hasError || !snapshot.hasData || snapshot.data!['data']['articles'].isEmpty) {
+                    return Center(child: Text('No trending articles'));
+                  }
+                  final articles = snapshot.data!['data']['articles'] as List;
+                  return ListView.builder(
+                    scrollDirection: Axis.horizontal,
+                    padding: EdgeInsets.only(left: 24),
+                    itemCount: articles.length,
+                    itemBuilder: (context, index) {
+                      final article = articles[index];
+                      return Container(
+                        width: 280,
+                        margin: EdgeInsets.only(right: 16),
+                        child: _TrendingNewsCard(
+                          article: article,
+                          token: widget.token,
+                          onBookmark: () => _toggleBookmark(article),
+                          onTap: () => _navigateToArticleDetail(article),
                         ),
                       );
                     },
-                    child: Text(
-                      'See all',
-                      style: GoogleFonts.poppins(
-                        fontSize: 14,
-                        color: Color(0xFF6B73FF),
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                ],
+                  );
+                },
               ),
-              const SizedBox(height: 16),
-
-              // Horizontal Trending News List
-              SizedBox(
-                height: 280,
-                child: FutureBuilder<Map<String, dynamic>>(
-                  future: _trendingArticles,
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting) {
-                      return Center(child: CircularProgressIndicator());
-                    } else if (snapshot.hasError) {
-                      return Center(
-                        child: Text(
-                          'Error loading trending news',
-                          style: GoogleFonts.poppins(),
-                        ),
-                      );
-                    } else if (!snapshot.hasData || snapshot.data!['data']['articles'].isEmpty) {
-                      return Center(
-                        child: Text(
-                          'No trending articles',
-                          style: GoogleFonts.poppins(),
-                        ),
-                      );
-                    }
-
-                    final articles = snapshot.data!['data']['articles'] as List;
-
-                    return ListView.builder(
+            ),
+          ),
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.all(24.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                   Text('Latest News', style: GoogleFonts.poppins(fontSize: 20, fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    height: 50,
+                    child: ListView.builder(
                       scrollDirection: Axis.horizontal,
-                      itemCount: articles.length,
+                      itemCount: _categories.length,
                       itemBuilder: (context, index) {
-                        final article = articles[index];
-                        return Container(
-                          width: 280,
-                          margin: EdgeInsets.only(right: 16),
-                          child: _TrendingNewsCard(
-                            article: article,
-                            onBookmark: () => _toggleBookmark(article),
-                            onTap: () => _navigateToArticleDetail(article),
+                        final category = _categories[index];
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 8.0),
+                          child: FilterChip(
+                            label: Text(category),
+                            selected: _selectedCategory == category,
+                            onSelected: (selected) => _applyCategoryFilter(category),
+                            selectedColor: Color(0xFF6B73FF),
+                            labelStyle: GoogleFonts.poppins(
+                              color: _selectedCategory == category ? Colors.white : Colors.black87,
+                            ),
                           ),
                         );
                       },
-                    );
-                  },
-                ),
-              ),
-              const SizedBox(height: 32),
-
-              // Latest News Section
-              Text(
-                'Latest News',
-                style: GoogleFonts.poppins(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.black87,
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              // Category Filter Chips
-              SizedBox(
-                height: 50,
-                child: ListView.builder(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: _categories.length,
-                  itemBuilder: (context, index) {
-                    final category = _categories[index];
-                    return Padding(
-                      padding: const EdgeInsets.only(right: 8.0),
-                      child: FilterChip(
-                        label: Text(category),
-                        selected: _selectedCategory == category,
-                        onSelected: (selected) {
-                          _applyCategoryFilter(category);
-                        },
-                        selectedColor: Color(0xFF6B73FF),
-                        backgroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(20),
-                          side: BorderSide(
-                            color: _selectedCategory == category 
-                                ? Colors.transparent 
-                                : Colors.grey[300]!,
-                          ),
-                        ),
-                        labelStyle: GoogleFonts.poppins(
-                          color: _selectedCategory == category 
-                              ? Colors.white 
-                              : Colors.black87,
-                          fontSize: 14,
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              // Vertical Articles List with infinite scroll
-              if (_isRefreshing)
-                Center(child: CircularProgressIndicator())
-              else if (_filteredArticles.isEmpty)
-                Center(
-                  child: Padding(
-                    padding: EdgeInsets.only(top: 50),
-                    child: Column(
-                      children: [
-                        Icon(Icons.article_outlined, size: 64, color: Colors.grey[400]),
-                        SizedBox(height: 16),
-                        Text(
-                          'No articles found',
-                          style: GoogleFonts.poppins(),
-                        ),
-                      ],
                     ),
                   ),
-                )
-              else
-                Column(
-                  children: [
-                    ..._filteredArticles.map((article) {
-                      return _LatestNewsItem(
-                        article: article,
-                        onBookmark: () => _toggleBookmark(article),
-                        onTap: () => _navigateToArticleDetail(article),
-                      );
-                    }).toList(),
-                    if (_isLoadingMore)
-                      Padding(
-                        padding: EdgeInsets.all(16),
-                        child: Center(child: CircularProgressIndicator()),
-                      ),
-                  ],
-                ),
-              const SizedBox(height: 24),
-            ],
+                  const SizedBox(height: 16),
+                ],
+              ),
+            ),
           ),
-        ),
+          _filteredArticles.isEmpty && !_isRefreshing 
+            ? SliverFillRemaining(child: Center(child: Text("No articles found")))
+            : SliverList(
+              delegate: SliverChildBuilderDelegate(
+                (context, index) {
+                  final article = _filteredArticles[index];
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                    child: _LatestNewsItem(
+                      article: article,
+                      token: widget.token,
+                      onBookmark: () => _toggleBookmark(article),
+                      onTap: () => _navigateToArticleDetail(article),
+                    ),
+                  );
+                },
+                childCount: _filteredArticles.length,
+              ),
+            ),
+           SliverToBoxAdapter(
+              child: _isLoadingMore ? Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Center(child: CircularProgressIndicator()),
+              ) : SizedBox(),
+            ),
+        ],
       ),
     );
   }
 }
 
-class _TrendingNewsCard extends StatelessWidget {
+class _TrendingNewsCard extends StatefulWidget {
   final Map<String, dynamic> article;
+  final String token;
   final VoidCallback onBookmark;
   final VoidCallback onTap;
 
-  const _TrendingNewsCard({
-    Key? key,
-    required this.article,
-    required this.onBookmark,
-    required this.onTap,
-  }) : super(key: key);
+  const _TrendingNewsCard({required this.article, required this.token, required this.onBookmark, required this.onTap});
+
+  @override
+  State<_TrendingNewsCard> createState() => _TrendingNewsCardState();
+}
+
+class _TrendingNewsCardState extends State<_TrendingNewsCard> {
+  final BookmarkService _bookmarkService = BookmarkService();
+  late Future<bool> _isBookmarkedFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _isBookmarkedFuture = _bookmarkService.isArticleBookmarked(widget.article['id'], widget.token);
+  }
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.grey.withOpacity(0.1),
-              spreadRadius: 2,
-              blurRadius: 5,
-              offset: Offset(0, 3),
-            ),
-          ],
-        ),
+      onTap: widget.onTap,
+      child: Card(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        elevation: 3,
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Stack(
               children: [
                 ClipRRect(
                   borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
                   child: Image.network(
-                    article['imageUrl'] ?? 'https://via.placeholder.com/150',
+                    widget.article['imageUrl'] ?? 'https://via.placeholder.com/150',
                     height: 150,
                     width: double.infinity,
                     fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) {
-                      return Container(
-                        height: 150,
-                        color: Colors.grey[200],
-                        child: Center(child: Icon(Icons.image, color: Colors.grey)),
-                      );
-                    },
                   ),
                 ),
                 Positioned(
                   top: 8,
                   right: 8,
                   child: FutureBuilder<bool>(
-                    future: BookmarkService.isArticleBookmarked(article['id']),
+                    future: _isBookmarkedFuture,
                     builder: (context, snapshot) {
                       final isBookmarked = snapshot.data ?? false;
                       return IconButton(
                         icon: Icon(
                           isBookmarked ? Icons.bookmark : Icons.bookmark_border,
-                          color: isBookmarked ? Colors.red : Colors.white,
+                          color: Colors.white,
                           size: 28,
                         ),
-                        onPressed: onBookmark,
+                        onPressed: widget.onBookmark,
                       );
                     },
                   ),
@@ -512,42 +402,16 @@ class _TrendingNewsCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Color(0xFF6B73FF).withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(
-                      article['category'] ?? 'General',
-                      style: GoogleFonts.poppins(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w500,
-                        color: Color(0xFF6B73FF),
-                      ),
-                    ),
+                  Text(
+                    widget.article['category'] ?? 'General',
+                    style: GoogleFonts.poppins(color: Color(0xFF6B73FF), fontWeight: FontWeight.w500),
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    article['title'] ?? 'No title',
+                    widget.article['title'] ?? 'No title',
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: GoogleFonts.poppins(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.black87,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    article['publishedAt'] ?? 'Unknown date',
-                    style: GoogleFonts.poppins(
-                      fontSize: 12,
-                      color: Colors.grey[500],
-                    ),
+                    style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.w600),
                   ),
                 ],
               ),
@@ -559,36 +423,38 @@ class _TrendingNewsCard extends StatelessWidget {
   }
 }
 
-class _LatestNewsItem extends StatelessWidget {
+
+class _LatestNewsItem extends StatefulWidget {
   final Map<String, dynamic> article;
+  final String token;
   final VoidCallback onBookmark;
   final VoidCallback onTap;
 
-  const _LatestNewsItem({
-    Key? key,
-    required this.article,
-    required this.onBookmark,
-    required this.onTap,
-  }) : super(key: key);
+  const _LatestNewsItem({required this.article, required this.token, required this.onBookmark, required this.onTap});
+
+  @override
+  State<_LatestNewsItem> createState() => _LatestNewsItemState();
+}
+
+class _LatestNewsItemState extends State<_LatestNewsItem> {
+  final BookmarkService _bookmarkService = BookmarkService();
+  late Future<bool> _isBookmarkedFuture;
+  
+  @override
+  void initState() {
+    super.initState();
+    _isBookmarkedFuture = _bookmarkService.isArticleBookmarked(widget.article['id'], widget.token);
+  }
+
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.grey.withOpacity(0.1),
-              spreadRadius: 2,
-              blurRadius: 5,
-              offset: Offset(0, 3),
-            ),
-          ],
-        ),
+      onTap: widget.onTap,
+      child: Card(
+         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        elevation: 3,
+        margin: EdgeInsets.only(bottom: 16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -597,33 +463,26 @@ class _LatestNewsItem extends StatelessWidget {
                 ClipRRect(
                   borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
                   child: Image.network(
-                    article['imageUrl'] ?? 'https://via.placeholder.com/150',
+                    widget.article['imageUrl'] ?? 'https://via.placeholder.com/150',
                     height: 180,
                     width: double.infinity,
                     fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) {
-                      return Container(
-                        height: 180,
-                        color: Colors.grey[200],
-                        child: Center(child: Icon(Icons.image, color: Colors.grey)),
-                      );
-                    },
                   ),
                 ),
                 Positioned(
                   top: 8,
                   right: 8,
                   child: FutureBuilder<bool>(
-                    future: BookmarkService.isArticleBookmarked(article['id']),
+                    future: _isBookmarkedFuture,
                     builder: (context, snapshot) {
                       final isBookmarked = snapshot.data ?? false;
-                      return IconButton(
+                       return IconButton(
                         icon: Icon(
                           isBookmarked ? Icons.bookmark : Icons.bookmark_border,
-                          color: isBookmarked ? Colors.red : Colors.white,
+                          color: Colors.white,
                           size: 28,
                         ),
-                        onPressed: onBookmark,
+                        onPressed: widget.onBookmark,
                       );
                     },
                   ),
@@ -635,116 +494,34 @@ class _LatestNewsItem extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: [
-                      CircleAvatar(
-                        radius: 18,
-                        backgroundImage: NetworkImage(
-                          article['author']?['avatar'] ?? 'https://via.placeholder.com/50'),
-                        backgroundColor: Colors.grey[200],
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Text(
-                                  article['author']?['name'] ?? 'Unknown',
-                                  style: GoogleFonts.poppins(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600,
-                                    color: Colors.black87,
-                                  ),
-                                ),
-                                if (article['isVerified'] ?? true) ...[
-                                  const SizedBox(width: 4),
-                                  Icon(
-                                    Icons.check_circle,
-                                    color: Color(0xFF6B73FF),
-                                    size: 14,
-                                  ),
-                                ],
-                              ],
-                            ),
-                            Text(
-                              article['publishedAt'] ?? 'Unknown date',
-                              style: GoogleFonts.poppins(
-                                fontSize: 11,
-                                color: Colors.grey[500],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      IconButton(
-                        icon: Icon(Icons.more_vert, color: Colors.grey[600]),
-                        onPressed: () {
-                          showModalBottomSheet(
-                            context: context,
-                            builder: (context) {
-                              return Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  ListTile(
-                                    leading: Icon(Icons.share),
-                                    title: Text('Share'),
-                                    onTap: () {
-                                      Navigator.pop(context);
-                                      // Implement share functionality
-                                    },
-                                  ),
-                                  ListTile(
-                                    leading: Icon(Icons.report),
-                                    title: Text('Report'),
-                                    onTap: () {
-                                      Navigator.pop(context);
-                                      // Implement report functionality
-                                    },
-                                  ),
-                                ],
-                              );
-                            },
-                          );
-                        },
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
                   Text(
-                    article['title'] ?? 'No title',
-                    style: GoogleFonts.poppins(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.black87,
-                    ),
+                    widget.article['title'] ?? 'No title',
+                    style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w600),
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    article['content']?.length > 100
-                        ? '${article['content'].substring(0, 100)}...'
-                        : article['content'] ?? 'No description',
-                    style: GoogleFonts.poppins(
-                      fontSize: 14,
-                      color: Colors.grey[600],
-                    ),
+                    widget.article['content']?.substring(0, 100) ?? 'No description',
+                    style: GoogleFonts.poppins(color: Colors.grey[600]),
                   ),
-                  const SizedBox(height: 12),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Color(0xFF6B73FF).withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(
-                      article['category'] ?? 'General',
-                      style: GoogleFonts.poppins(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w500,
-                        color: Color(0xFF6B73FF),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                       CircleAvatar(
+                        radius: 18,
+                        backgroundImage: NetworkImage(widget.article['author']?['avatar'] ?? 'https://via.placeholder.com/50'),
                       ),
-                    ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          widget.article['author']?['name'] ?? 'Unknown',
+                          style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                       Text(
+                        widget.article['publishedAt'] ?? 'Unknown date',
+                        style: GoogleFonts.poppins(color: Colors.grey[500]),
+                      ),
+                    ],
                   ),
                 ],
               ),
