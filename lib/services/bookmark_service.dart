@@ -45,5 +45,15 @@ class BookmarkService {
     bookmarks.removeWhere((item) => item['articleId'] == articleId);
     await prefs.setString(_bookmarksKey, json.encode(bookmarks));
   }
+
+  static Future<bool> isArticleBookmarked(String articleId) async {
+    final prefs = await SharedPreferences.getInstance();
+    final bookmarksJson = prefs.getString(_bookmarksKey);
+    if (bookmarksJson != null) {
+      final List<dynamic> decoded = json.decode(bookmarksJson);
+      return decoded.any((item) => item['articleId'] == articleId);
+    }
+    return false;
+  }
 }
 

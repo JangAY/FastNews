@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../services/news_service.dart';
+import '../services/bookmark_service.dart';
 import 'search_page.dart';
 import 'bookmarks_page.dart';
 import 'profile_page.dart';
+import 'article_detail_page.dart'; // Asumsikan kita punya halaman detail
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -74,6 +76,7 @@ class __HomePageContentState extends State<_HomePageContent> {
   List<dynamic> _filteredArticles = [];
   int _currentPage = 1;
   bool _isLoadingMore = false;
+  bool _isRefreshing = false;
   final ScrollController _scrollController = ScrollController();
   String _selectedCategory = 'All';
 
@@ -111,7 +114,36 @@ class __HomePageContentState extends State<_HomePageContent> {
       });
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to load articles: $e')),
+        SnackBar(
+          content: Text('Failed to load articles: $e'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  Future<void> _refreshArticles() async {
+    setState(() {
+      _isRefreshing = true;
+      _currentPage = 1;
+    });
+    
+    try {
+      final response = await _newsService.fetchArticles(page: _currentPage);
+      setState(() {
+        _allArticles = response['data']['articles'];
+        _filteredArticles = _allArticles;
+        _isRefreshing = false;
+      });
+    } catch (e) {
+      setState(() {
+        _isRefreshing = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to refresh articles: $e'),
+          behavior: SnackBarBehavior.floating,
+        ),
       );
     }
   }
@@ -136,7 +168,10 @@ class __HomePageContentState extends State<_HomePageContent> {
         _isLoadingMore = false;
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to load more articles: $e')),
+        SnackBar(
+          content: Text('Failed to load more articles: $e'),
+          behavior: SnackBarBehavior.floating,
+        ),
       );
     }
   }
@@ -161,211 +196,263 @@ class __HomePageContentState extends State<_HomePageContent> {
     });
   }
 
+  Future<void> _toggleBookmark(Map<String, dynamic> article) async {
+    final isBookmarked = await BookmarkService.isArticleBookmarked(article['id']);
+    
+    if (isBookmarked) {
+      await BookmarkService.removeBookmark(article['id']);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Bookmark removed'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } else {
+      await BookmarkService.saveBookmark(
+        articleId: article['id'],
+        title: article['title'],
+        imageUrl: article['imageUrl'],
+        category: article['category'],
+        date: article['publishedAt'],
+        description: article['content'] ?? article['description'] ?? '',
+      );
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Article bookmarked'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  void _navigateToArticleDetail(Map<String, dynamic> article) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ArticleDetailPage(article: article),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      controller: _scrollController,
-      child: Padding(
-        padding: const EdgeInsets.only(top: 60.0, left: 24.0, right: 24.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'FastNews',
-              style: GoogleFonts.poppins(
-                fontSize: 32,
-                fontWeight: FontWeight.bold,
-                color: Colors.black87,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'Kabar Terkini, Dari Kami untuk Negeri',
-              style: GoogleFonts.poppins(fontSize: 14, color: Colors.grey[600]),
-            ),
-            const SizedBox(height: 32),
-
-            // Trending News Section
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'Trending news',
-                  style: GoogleFonts.poppins(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.black87,
-                  ),
+    return RefreshIndicator(
+      onRefresh: _refreshArticles,
+      child: SingleChildScrollView(
+        controller: _scrollController,
+        physics: AlwaysScrollableScrollPhysics(),
+        child: Padding(
+          padding: const EdgeInsets.only(top: 60.0, left: 24.0, right: 24.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'FastNews',
+                style: GoogleFonts.poppins(
+                  fontSize: 32,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
                 ),
-                TextButton(
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('See all trending news clicked')),
-                    );
-                  },
-                  child: Text(
-                    'See all',
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Kabar Terkini, Dari Kami untuk Negeri',
+                style: GoogleFonts.poppins(fontSize: 14, color: Colors.grey[600]),
+              ),
+              const SizedBox(height: 32),
+
+              // Trending News Section
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Trending news',
                     style: GoogleFonts.poppins(
-                      fontSize: 14,
-                      color: Color(0xFF6B73FF),
-                      fontWeight: FontWeight.w500,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black87,
                     ),
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-
-            // Horizontal Trending News List
-            SizedBox(
-              height: 280,
-              child: FutureBuilder<Map<String, dynamic>>(
-                future: _trendingArticles,
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return Center(child: CircularProgressIndicator());
-                  } else if (snapshot.hasError) {
-                    return Center(child: Text('Error: ${snapshot.error}'));
-                  } else if (!snapshot.hasData || snapshot.data!['data']['articles'].isEmpty) {
-                    return Center(child: Text('No trending articles found'));
-                  }
-
-                  final articles = snapshot.data!['data']['articles'] as List;
-
-                  return ListView.builder(
-                    scrollDirection: Axis.horizontal,
-                    itemCount: articles.length,
-                    itemBuilder: (context, index) {
-                      final article = articles[index];
-                      return Container(
-                        width: 280,
-                        margin: EdgeInsets.only(right: 16),
-                        child: _TrendingNewsCard(
-                          imageUrl: article['imageUrl'] ?? 'https://via.placeholder.com/150',
-                          category: article['category'] ?? 'General',
-                          title: article['title'] ?? 'No title',
-                          date: article['publishedAt'] ?? 'Unknown date',
-                          articleId: article['id'],
+                  TextButton(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => BookmarksPage(),
                         ),
                       );
                     },
-                  );
-                },
-              ),
-            ),
-            const SizedBox(height: 32),
-
-            // Latest News Section
-            Text(
-              'Latest News',
-              style: GoogleFonts.poppins(
-                fontSize: 20,
-                fontWeight: FontWeight.w600,
-                color: Colors.black87,
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            // Category Filter Chips
-            SizedBox(
-              height: 50,
-              child: ListView.builder(
-                scrollDirection: Axis.horizontal,
-                itemCount: _categories.length,
-                itemBuilder: (context, index) {
-                  final category = _categories[index];
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 8.0),
-                    child: FilterChip(
-                      label: Text(category),
-                      selected: _selectedCategory == category,
-                      onSelected: (selected) {
-                        _applyCategoryFilter(category);
-                      },
-                      selectedColor: Color(0xFF6B73FF),
-                      backgroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(20),
-                        side: BorderSide(
-                          color: _selectedCategory == category 
-                              ? Colors.transparent 
-                              : Colors.grey[300]!,
-                        ),
-                      ),
-                      labelStyle: GoogleFonts.poppins(
-                        color: _selectedCategory == category 
-                            ? Colors.white 
-                            : Colors.black87,
+                    child: Text(
+                      'See all',
+                      style: GoogleFonts.poppins(
                         fontSize: 14,
+                        color: Color(0xFF6B73FF),
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
-                  );
-                },
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            // Vertical Articles List with infinite scroll
-            if (_filteredArticles.isEmpty)
-              Center(child: Text('No articles found'))
-            else
-              Column(
-                children: [
-                  ..._filteredArticles.map((article) {
-                    return _LatestNewsItem(
-                      imageUrl: article['imageUrl'] ?? 'https://via.placeholder.com/150',
-                      avatarUrl: article['author']?['avatar'] ?? 'https://via.placeholder.com/50',
-                      publisherName: article['author']?['name'] ?? 'Unknown',
-                      isVerified: true,
-                      title: article['title'] ?? 'No title',
-                      description: article['content']?.length > 100
-                          ? '${article['content'].substring(0, 100)}...'
-                          : article['content'] ?? 'No description',
-                      category: article['category'] ?? 'General',
-                      articleId: article['id'],
-                      date: article['publishedAt'] ?? 'Unknown date',
-                    );
-                  }).toList(),
-                  if (_isLoadingMore)
-                    Padding(
-                      padding: EdgeInsets.all(16),
-                      child: Center(child: CircularProgressIndicator()),
-                    ),
+                  ),
                 ],
               ),
-            const SizedBox(height: 24),
-          ],
+              const SizedBox(height: 16),
+
+              // Horizontal Trending News List
+              SizedBox(
+                height: 280,
+                child: FutureBuilder<Map<String, dynamic>>(
+                  future: _trendingArticles,
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return Center(child: CircularProgressIndicator());
+                    } else if (snapshot.hasError) {
+                      return Center(
+                        child: Text(
+                          'Error loading trending news',
+                          style: GoogleFonts.poppins(),
+                        ),
+                      );
+                    } else if (!snapshot.hasData || snapshot.data!['data']['articles'].isEmpty) {
+                      return Center(
+                        child: Text(
+                          'No trending articles',
+                          style: GoogleFonts.poppins(),
+                        ),
+                      );
+                    }
+
+                    final articles = snapshot.data!['data']['articles'] as List;
+
+                    return ListView.builder(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: articles.length,
+                      itemBuilder: (context, index) {
+                        final article = articles[index];
+                        return Container(
+                          width: 280,
+                          margin: EdgeInsets.only(right: 16),
+                          child: _TrendingNewsCard(
+                            article: article,
+                            onBookmark: () => _toggleBookmark(article),
+                            onTap: () => _navigateToArticleDetail(article),
+                          ),
+                        );
+                      },
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 32),
+
+              // Latest News Section
+              Text(
+                'Latest News',
+                style: GoogleFonts.poppins(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.black87,
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Category Filter Chips
+              SizedBox(
+                height: 50,
+                child: ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: _categories.length,
+                  itemBuilder: (context, index) {
+                    final category = _categories[index];
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 8.0),
+                      child: FilterChip(
+                        label: Text(category),
+                        selected: _selectedCategory == category,
+                        onSelected: (selected) {
+                          _applyCategoryFilter(category);
+                        },
+                        selectedColor: Color(0xFF6B73FF),
+                        backgroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(20),
+                          side: BorderSide(
+                            color: _selectedCategory == category 
+                                ? Colors.transparent 
+                                : Colors.grey[300]!,
+                          ),
+                        ),
+                        labelStyle: GoogleFonts.poppins(
+                          color: _selectedCategory == category 
+                              ? Colors.white 
+                              : Colors.black87,
+                          fontSize: 14,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Vertical Articles List with infinite scroll
+              if (_isRefreshing)
+                Center(child: CircularProgressIndicator())
+              else if (_filteredArticles.isEmpty)
+                Center(
+                  child: Padding(
+                    padding: EdgeInsets.only(top: 50),
+                    child: Column(
+                      children: [
+                        Icon(Icons.article_outlined, size: 64, color: Colors.grey[400]),
+                        SizedBox(height: 16),
+                        Text(
+                          'No articles found',
+                          style: GoogleFonts.poppins(),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              else
+                Column(
+                  children: [
+                    ..._filteredArticles.map((article) {
+                      return _LatestNewsItem(
+                        article: article,
+                        onBookmark: () => _toggleBookmark(article),
+                        onTap: () => _navigateToArticleDetail(article),
+                      );
+                    }).toList(),
+                    if (_isLoadingMore)
+                      Padding(
+                        padding: EdgeInsets.all(16),
+                        child: Center(child: CircularProgressIndicator()),
+                      ),
+                  ],
+                ),
+              const SizedBox(height: 24),
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
-// Trending News Card Widget
 class _TrendingNewsCard extends StatelessWidget {
-  final String imageUrl;
-  final String category;
-  final String title;
-  final String date;
-  final String articleId;
+  final Map<String, dynamic> article;
+  final VoidCallback onBookmark;
+  final VoidCallback onTap;
 
   const _TrendingNewsCard({
     Key? key,
-    required this.imageUrl,
-    required this.category,
-    required this.title,
-    required this.date,
-    required this.articleId,
+    required this.article,
+    required this.onBookmark,
+    required this.onTap,
   }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: () {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Opening article: $title')),
-        );
-      },
+      onTap: onTap,
       child: Container(
         decoration: BoxDecoration(
           color: Colors.white,
@@ -382,21 +469,43 @@ class _TrendingNewsCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            ClipRRect(
-              borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
-              child: Image.network(
-                imageUrl,
-                height: 150,
-                width: double.infinity,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) {
-                  return Container(
+            Stack(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
+                  child: Image.network(
+                    article['imageUrl'] ?? 'https://via.placeholder.com/150',
                     height: 150,
-                    color: Colors.grey[200],
-                    child: Center(child: Icon(Icons.image, color: Colors.grey)),
-                  );
-                },
-              ),
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) {
+                      return Container(
+                        height: 150,
+                        color: Colors.grey[200],
+                        child: Center(child: Icon(Icons.image, color: Colors.grey)),
+                      );
+                    },
+                  ),
+                ),
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: FutureBuilder<bool>(
+                    future: BookmarkService.isArticleBookmarked(article['id']),
+                    builder: (context, snapshot) {
+                      final isBookmarked = snapshot.data ?? false;
+                      return IconButton(
+                        icon: Icon(
+                          isBookmarked ? Icons.bookmark : Icons.bookmark_border,
+                          color: isBookmarked ? Colors.red : Colors.white,
+                          size: 28,
+                        ),
+                        onPressed: onBookmark,
+                      );
+                    },
+                  ),
+                ),
+              ],
             ),
             Padding(
               padding: const EdgeInsets.all(12.0),
@@ -413,7 +522,7 @@ class _TrendingNewsCard extends StatelessWidget {
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Text(
-                      category,
+                      article['category'] ?? 'General',
                       style: GoogleFonts.poppins(
                         fontSize: 10,
                         fontWeight: FontWeight.w500,
@@ -423,7 +532,7 @@ class _TrendingNewsCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    title,
+                    article['title'] ?? 'No title',
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: GoogleFonts.poppins(
@@ -434,7 +543,7 @@ class _TrendingNewsCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    date,
+                    article['publishedAt'] ?? 'Unknown date',
                     style: GoogleFonts.poppins(
                       fontSize: 12,
                       color: Colors.grey[500],
@@ -450,39 +559,22 @@ class _TrendingNewsCard extends StatelessWidget {
   }
 }
 
-// Latest News Item Widget
 class _LatestNewsItem extends StatelessWidget {
-  final String imageUrl;
-  final String avatarUrl;
-  final String publisherName;
-  final bool isVerified;
-  final String title;
-  final String description;
-  final String category;
-  final String articleId;
-  final String date;
+  final Map<String, dynamic> article;
+  final VoidCallback onBookmark;
+  final VoidCallback onTap;
 
   const _LatestNewsItem({
     Key? key,
-    required this.imageUrl,
-    required this.avatarUrl,
-    required this.publisherName,
-    this.isVerified = false,
-    required this.title,
-    required this.description,
-    required this.category,
-    required this.articleId,
-    required this.date,
+    required this.article,
+    required this.onBookmark,
+    required this.onTap,
   }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: () {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Opening article: $title')),
-        );
-      },
+      onTap: onTap,
       child: Container(
         margin: const EdgeInsets.only(bottom: 16),
         decoration: BoxDecoration(
@@ -500,21 +592,43 @@ class _LatestNewsItem extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            ClipRRect(
-              borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
-              child: Image.network(
-                imageUrl,
-                height: 180,
-                width: double.infinity,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) {
-                  return Container(
+            Stack(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
+                  child: Image.network(
+                    article['imageUrl'] ?? 'https://via.placeholder.com/150',
                     height: 180,
-                    color: Colors.grey[200],
-                    child: Center(child: Icon(Icons.image, color: Colors.grey)),
-                  );
-                },
-              ),
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) {
+                      return Container(
+                        height: 180,
+                        color: Colors.grey[200],
+                        child: Center(child: Icon(Icons.image, color: Colors.grey)),
+                      );
+                    },
+                  ),
+                ),
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: FutureBuilder<bool>(
+                    future: BookmarkService.isArticleBookmarked(article['id']),
+                    builder: (context, snapshot) {
+                      final isBookmarked = snapshot.data ?? false;
+                      return IconButton(
+                        icon: Icon(
+                          isBookmarked ? Icons.bookmark : Icons.bookmark_border,
+                          color: isBookmarked ? Colors.red : Colors.white,
+                          size: 28,
+                        ),
+                        onPressed: onBookmark,
+                      );
+                    },
+                  ),
+                ),
+              ],
             ),
             Padding(
               padding: const EdgeInsets.all(12.0),
@@ -525,7 +639,8 @@ class _LatestNewsItem extends StatelessWidget {
                     children: [
                       CircleAvatar(
                         radius: 18,
-                        backgroundImage: NetworkImage(avatarUrl),
+                        backgroundImage: NetworkImage(
+                          article['author']?['avatar'] ?? 'https://via.placeholder.com/50'),
                         backgroundColor: Colors.grey[200],
                       ),
                       const SizedBox(width: 12),
@@ -536,14 +651,14 @@ class _LatestNewsItem extends StatelessWidget {
                             Row(
                               children: [
                                 Text(
-                                  publisherName,
+                                  article['author']?['name'] ?? 'Unknown',
                                   style: GoogleFonts.poppins(
                                     fontSize: 13,
                                     fontWeight: FontWeight.w600,
                                     color: Colors.black87,
                                   ),
                                 ),
-                                if (isVerified) ...[
+                                if (article['isVerified'] ?? true) ...[
                                   const SizedBox(width: 4),
                                   Icon(
                                     Icons.check_circle,
@@ -554,7 +669,7 @@ class _LatestNewsItem extends StatelessWidget {
                               ],
                             ),
                             Text(
-                              date,
+                              article['publishedAt'] ?? 'Unknown date',
                               style: GoogleFonts.poppins(
                                 fontSize: 11,
                                 color: Colors.grey[500],
@@ -566,10 +681,31 @@ class _LatestNewsItem extends StatelessWidget {
                       IconButton(
                         icon: Icon(Icons.more_vert, color: Colors.grey[600]),
                         onPressed: () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('More options clicked for $publisherName'),
-                            ),
+                          showModalBottomSheet(
+                            context: context,
+                            builder: (context) {
+                              return Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  ListTile(
+                                    leading: Icon(Icons.share),
+                                    title: Text('Share'),
+                                    onTap: () {
+                                      Navigator.pop(context);
+                                      // Implement share functionality
+                                    },
+                                  ),
+                                  ListTile(
+                                    leading: Icon(Icons.report),
+                                    title: Text('Report'),
+                                    onTap: () {
+                                      Navigator.pop(context);
+                                      // Implement report functionality
+                                    },
+                                  ),
+                                ],
+                              );
+                            },
                           );
                         },
                       ),
@@ -577,7 +713,7 @@ class _LatestNewsItem extends StatelessWidget {
                   ),
                   const SizedBox(height: 12),
                   Text(
-                    title,
+                    article['title'] ?? 'No title',
                     style: GoogleFonts.poppins(
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
@@ -586,7 +722,9 @@ class _LatestNewsItem extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    description,
+                    article['content']?.length > 100
+                        ? '${article['content'].substring(0, 100)}...'
+                        : article['content'] ?? 'No description',
                     style: GoogleFonts.poppins(
                       fontSize: 14,
                       color: Colors.grey[600],
@@ -600,7 +738,7 @@ class _LatestNewsItem extends StatelessWidget {
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Text(
-                      category,
+                      article['category'] ?? 'General',
                       style: GoogleFonts.poppins(
                         fontSize: 10,
                         fontWeight: FontWeight.w500,
