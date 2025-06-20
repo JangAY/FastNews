@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:fastnews/views/login_page.dart';
 import 'package:fastnews/services/news_service.dart';
 import 'package:fastnews/services/auth_service.dart';
+import 'add_article_page.dart'; // Import halaman baru
 
 class ProfilePage extends StatefulWidget {
   final String token;
@@ -27,25 +28,34 @@ class _ProfilePageState extends State<ProfilePage> {
 
   Future<void> _loadUserData() async {
     final data = await _authService.getUserData();
-    setState(() {
-      _userData = data;
-    });
+    if (mounted) {
+      setState(() {
+        _userData = data;
+      });
+    }
   }
 
   void _handleLogout() async {
     await _authService.logout();
-    Navigator.pushAndRemoveUntil(
-      context,
-      MaterialPageRoute(builder: (context) => LoginPage()),
-      (Route<dynamic> route) => false,
-    );
+    if (mounted) {
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (context) => LoginPage()),
+        (Route<dynamic> route) => false,
+      );
+    }
   }
   
-  // Placeholder for future implementation
-  void _showAddArticleForm() {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Add article functionality coming soon!')),
-    );
+  void _navigateAndRefresh() {
+    // Navigasi ke halaman tambah artikel
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => AddArticlePage(token: widget.token)),
+    ).then((_) {
+      // Blok ini akan berjalan ketika kita kembali dari AddArticlePage.
+      // Cukup panggil setState untuk memicu FutureBuilder membangun ulang.
+      setState(() {});
+    });
   }
 
   @override
@@ -54,14 +64,15 @@ class _ProfilePageState extends State<ProfilePage> {
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
+        automaticallyImplyLeading: false, // Menghapus tombol kembali default
         title: Text('Profile', style: GoogleFonts.poppins(color: Colors.black, fontWeight: FontWeight.w600)),
         centerTitle: true,
-         actions: [
-            IconButton(
-              icon: const Icon(Icons.add, color: Colors.grey),
-              onPressed: _showAddArticleForm,
-            ),
-          ],
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.add_circle_outline, color: Colors.black),
+            onPressed: _navigateAndRefresh, // Panggil fungsi navigasi
+          ),
+        ],
       ),
       body: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
@@ -92,15 +103,16 @@ class _ProfilePageState extends State<ProfilePage> {
             ),
             const SizedBox(height: 16),
             Expanded(
+              // FutureBuilder akan otomatis berjalan lagi saat setState dipanggil
               child: FutureBuilder<Map<String, dynamic>>(
-                future: _newsService.getUserArticles(widget.token),
+                future: _newsService.getUserArticles(widget.token), // Mengambil artikel pengguna
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return Center(child: CircularProgressIndicator());
                   } else if (snapshot.hasError) {
-                    return Center(child: Text('Error: ${snapshot.error}'));
-                  } else if (!snapshot.hasData || snapshot.data!['data']['articles'].isEmpty) {
-                    return Center(child: Text('You have not created any articles.'));
+                    return Center(child: Text('Error: Could not load articles'));
+                  } else if (!snapshot.hasData || (snapshot.data!['data']['articles'] as List).isEmpty) {
+                    return Center(child: Text('You have not created any articles yet.'));
                   }
                   
                   final articles = snapshot.data!['data']['articles'] as List;
@@ -111,26 +123,31 @@ class _ProfilePageState extends State<ProfilePage> {
                       return Card(
                         margin: EdgeInsets.only(bottom: 16),
                         child: ListTile(
-                          title: Text(article['title']),
-                          subtitle: Text(article['category']),
+                          title: Text(article['title'], style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
+                          subtitle: Text(article['category'], style: GoogleFonts.poppins()),
                           trailing: IconButton(
-                            icon: Icon(Icons.delete, color: Colors.red),
+                            icon: Icon(Icons.delete, color: Colors.red[400]),
                             onPressed: () async {
-                              // Optimistic delete
-                              setState(() {
-                                (articles).removeAt(index);
-                              });
-                              try {
-                                await _newsService.deleteArticle(article['id'], widget.token);
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text("Article deleted"))
-                                );
-                              } catch(e) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text("Failed to delete article"))
-                                );
-                                // Re-fetch on error
-                                setState((){});
+                              final bool? confirmed = await showDialog(
+                                context: context,
+                                builder: (context) => AlertDialog(
+                                  title: Text('Delete Article'),
+                                  content: Text('Are you sure you want to delete this article?'),
+                                  actions: [
+                                    TextButton(onPressed: () => Navigator.pop(context, false), child: Text('Cancel')),
+                                    TextButton(onPressed: () => Navigator.pop(context, true), child: Text('Delete')),
+                                  ],
+                                ),
+                              );
+
+                              if (confirmed == true) {
+                                try {
+                                  await _newsService.deleteArticle(article['id'], widget.token); // Menghapus artikel
+                                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Article deleted")));
+                                  setState(() {}); // Refresh list
+                                } catch(e) {
+                                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Failed to delete article")));
+                                }
                               }
                             },
                           ),
@@ -141,12 +158,13 @@ class _ProfilePageState extends State<ProfilePage> {
                 },
               ),
             ),
+             const SizedBox(height: 16),
             SizedBox(
               width: double.infinity,
               height: 50,
               child: ElevatedButton(
                 onPressed: _handleLogout,
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.red[400]),
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.red[400], shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
                 child: Text(
                   'Log Out',
                   style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.white),
