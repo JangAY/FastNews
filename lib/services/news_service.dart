@@ -3,7 +3,20 @@ import 'package:http/http.dart' as http;
 
 class NewsService {
   static const String baseUrl = 'https://rest-api-berita.vercel.app/api/v1';
+  
+  Future<Map<String, dynamic>> searchArticles({required String query, int page = 1, int limit = 10}) async {
+      // Menambahkan parameter 'search' ke URL
+      final urlString = '$baseUrl/news?search=$query&page=$page&limit=$limit';
+      final url = Uri.parse(urlString);
+      final response = await http.get(url);
 
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      } else {
+        throw Exception('Failed to search articles');
+      }
+    }
+  
   // --- Public Endpoints ---
   Future<Map<String, dynamic>> fetchArticles({int page = 1, int limit = 10, String? category}) async {
     String urlString = '$baseUrl/news?page=$page&limit=$limit';
