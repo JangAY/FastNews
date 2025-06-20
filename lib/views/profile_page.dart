@@ -3,7 +3,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:fastnews/views/login_page.dart';
 import 'package:fastnews/services/news_service.dart';
 import 'package:fastnews/services/auth_service.dart';
-import 'add_article_page.dart'; // Import halaman baru
+import 'add_article_page.dart';
+import 'edit_article_page.dart'; // Import the new edit page
 
 class ProfilePage extends StatefulWidget {
   final String token;
@@ -46,7 +47,7 @@ class _ProfilePageState extends State<ProfilePage> {
     }
   }
   
-  void _navigateAndRefresh() {
+  void _navigateAndRefreshAdd() {
     // Navigasi ke halaman tambah artikel
     Navigator.push(
       context,
@@ -58,19 +59,30 @@ class _ProfilePageState extends State<ProfilePage> {
     });
   }
 
+  void _navigateAndRefreshEdit(Map<String, dynamic> article) {
+    // Navigasi ke halaman edit artikel
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => EditArticlePage(token: widget.token, article: article)),
+    ).then((_) {
+      // Refresh list after returning from edit page
+      setState(() {});
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
-        automaticallyImplyLeading: false, // Menghapus tombol kembali default
+        automaticallyImplyLeading: false,
         title: Text('Profile', style: GoogleFonts.poppins(color: Colors.black, fontWeight: FontWeight.w600)),
         centerTitle: true,
         actions: [
           IconButton(
             icon: const Icon(Icons.add_circle_outline, color: Colors.black),
-            onPressed: _navigateAndRefresh, // Panggil fungsi navigasi
+            onPressed: _navigateAndRefreshAdd,
           ),
         ],
       ),
@@ -103,9 +115,8 @@ class _ProfilePageState extends State<ProfilePage> {
             ),
             const SizedBox(height: 16),
             Expanded(
-              // FutureBuilder akan otomatis berjalan lagi saat setState dipanggil
               child: FutureBuilder<Map<String, dynamic>>(
-                future: _newsService.getUserArticles(widget.token), // Mengambil artikel pengguna
+                future: _newsService.getUserArticles(widget.token),
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return Center(child: CircularProgressIndicator());
@@ -125,31 +136,40 @@ class _ProfilePageState extends State<ProfilePage> {
                         child: ListTile(
                           title: Text(article['title'], style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
                           subtitle: Text(article['category'], style: GoogleFonts.poppins()),
-                          trailing: IconButton(
-                            icon: Icon(Icons.delete, color: Colors.red[400]),
-                            onPressed: () async {
-                              final bool? confirmed = await showDialog(
-                                context: context,
-                                builder: (context) => AlertDialog(
-                                  title: Text('Delete Article'),
-                                  content: Text('Are you sure you want to delete this article?'),
-                                  actions: [
-                                    TextButton(onPressed: () => Navigator.pop(context, false), child: Text('Cancel')),
-                                    TextButton(onPressed: () => Navigator.pop(context, true), child: Text('Delete')),
-                                  ],
-                                ),
-                              );
+                          trailing: Row( // Use a Row for multiple actions
+                            mainAxisSize: MainAxisSize.min, // Important to prevent overflow
+                            children: [
+                              IconButton(
+                                icon: Icon(Icons.edit, color: Colors.blue[400]), // Edit icon
+                                onPressed: () => _navigateAndRefreshEdit(article), // Navigate to edit page
+                              ),
+                              IconButton(
+                                icon: Icon(Icons.delete, color: Colors.red[400]),
+                                onPressed: () async {
+                                  final bool? confirmed = await showDialog(
+                                    context: context,
+                                    builder: (context) => AlertDialog(
+                                      title: Text('Delete Article'),
+                                      content: Text('Are you sure you want to delete this article?'),
+                                      actions: [
+                                        TextButton(onPressed: () => Navigator.pop(context, false), child: Text('Cancel')),
+                                        TextButton(onPressed: () => Navigator.pop(context, true), child: Text('Delete')),
+                                      ],
+                                    ),
+                                  );
 
-                              if (confirmed == true) {
-                                try {
-                                  await _newsService.deleteArticle(article['id'], widget.token); // Menghapus artikel
-                                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Article deleted")));
-                                  setState(() {}); // Refresh list
-                                } catch(e) {
-                                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Failed to delete article")));
-                                }
-                              }
-                            },
+                                  if (confirmed == true) {
+                                    try {
+                                      await _newsService.deleteArticle(article['id'], widget.token);
+                                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Article deleted")));
+                                      setState(() {}); // Refresh list
+                                    } catch(e) {
+                                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Failed to delete article")));
+                                    }
+                                  }
+                                },
+                              ),
+                            ],
                           ),
                         ),
                       );
