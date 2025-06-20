@@ -338,6 +338,7 @@ class __HomePageContentState extends State<_HomePageContent> {
                           return Padding(
                             padding: const EdgeInsets.only(right: 8.0),
                             child: FilterChip(
+                              showCheckmark: false,
                               label: Text(category),
                               selected: isSelected,
                               onSelected: (selected) =>
