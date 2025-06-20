@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart'; // Impor untuk PointerDeviceKind
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../services/news_service.dart';
@@ -6,6 +7,15 @@ import 'search_page.dart';
 import 'bookmarks_page.dart';
 import 'profile_page.dart';
 import 'article_detail_page.dart';
+
+// KELAS HELPER UNTUK MENGAKTIFKAN SCROLL DENGAN MOUSE
+class MyCustomScrollBehavior extends MaterialScrollBehavior {
+  @override
+  Set<PointerDeviceKind> get dragDevices => {
+        PointerDeviceKind.touch,
+        PointerDeviceKind.mouse,
+      };
+}
 
 class HomePage extends StatefulWidget {
   final String token;
@@ -38,7 +48,6 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
-    // Scaffold sekarang akan menggunakan warna dari tema global
     return Scaffold(
       body: _widgetOptions.elementAt(_selectedIndex),
       bottomNavigationBar: BottomNavigationBar(
@@ -55,10 +64,9 @@ class _HomePageState extends State<HomePage> {
           ),
         ],
         currentIndex: _selectedIndex,
-        // Menggunakan warna dari tema untuk item yang dipilih
-        selectedItemColor: Theme.of(context).primaryColor, 
-        // Menggunakan warna yang lebih kontras di mode gelap
-        unselectedItemColor: Theme.of(context).textTheme.bodySmall?.color?.withOpacity(0.7),
+        selectedItemColor: Theme.of(context).primaryColor,
+        unselectedItemColor:
+            Theme.of(context).textTheme.bodySmall?.color?.withOpacity(0.7),
         onTap: _onItemTapped,
         type: BottomNavigationBarType.fixed,
         selectedLabelStyle: GoogleFonts.poppins(
@@ -111,14 +119,14 @@ class __HomePageContentState extends State<_HomePageContent> {
   Future<void> _loadInitialArticles() async {
     try {
       final response = await _newsService.fetchArticles(page: 1);
-      if(mounted){
+      if (mounted) {
         setState(() {
           _allArticles = response['data']['articles'];
           _applyCategoryFilter(_selectedCategory);
         });
       }
     } catch (e) {
-      if(mounted){
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Failed to load articles: $e')),
         );
@@ -132,7 +140,7 @@ class __HomePageContentState extends State<_HomePageContent> {
       _currentPage = 1;
     });
     await _loadInitialArticles();
-    if(mounted){
+    if (mounted) {
       setState(() {
         _isRefreshing = false;
       });
@@ -140,7 +148,8 @@ class __HomePageContentState extends State<_HomePageContent> {
   }
 
   void _scrollListener() {
-    if (_scrollController.position.pixels == _scrollController.position.maxScrollExtent) {
+    if (_scrollController.position.pixels ==
+        _scrollController.position.maxScrollExtent) {
       _loadMoreArticles();
     }
   }
@@ -151,8 +160,10 @@ class __HomePageContentState extends State<_HomePageContent> {
 
     _currentPage++;
     try {
-      final response = await _newsService.fetchArticles(page: _currentPage, category: _selectedCategory == 'All' ? null : _selectedCategory);
-      if(mounted){
+      final response = await _newsService.fetchArticles(
+          page: _currentPage,
+          category: _selectedCategory == 'All' ? null : _selectedCategory);
+      if (mounted) {
         setState(() {
           _allArticles.addAll(response['data']['articles']);
           _applyCategoryFilter(_selectedCategory);
@@ -161,39 +172,47 @@ class __HomePageContentState extends State<_HomePageContent> {
     } catch (e) {
       // Handle error
     } finally {
-      if(mounted){
+      if (mounted) {
         setState(() => _isLoadingMore = false);
       }
     }
   }
-  
+
   void _applyCategoryFilter(String category) {
     setState(() {
       _selectedCategory = category;
       if (category == 'All') {
-        _filteredArticles = _allArticles;
+        _filteredArticles = List.from(_allArticles);
       } else {
-        _filteredArticles = _allArticles.where((article) => 
-          article['category']?.toLowerCase() == category.toLowerCase()
-        ).toList();
+        _filteredArticles = _allArticles
+            .where((article) =>
+                article['category']?.toLowerCase() == category.toLowerCase())
+            .toList();
       }
     });
   }
 
   Future<void> _toggleBookmark(Map<String, dynamic> article) async {
     try {
-      final isBookmarked = await _bookmarkService.isArticleBookmarked(article['id'], widget.token);
+      final isBookmarked =
+          await _bookmarkService.isArticleBookmarked(article['id'], widget.token);
 
       if (isBookmarked) {
         await _bookmarkService.removeBookmark(article['id'], widget.token);
-        if(mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Bookmark removed')));
+        if (mounted)
+          ScaffoldMessenger.of(context)
+              .showSnackBar(SnackBar(content: Text('Bookmark removed')));
       } else {
         await _bookmarkService.saveBookmark(article['id'], widget.token);
-        if(mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Article bookmarked')));
+        if (mounted)
+          ScaffoldMessenger.of(context)
+              .showSnackBar(SnackBar(content: Text('Article bookmarked')));
       }
-      setState(() {}); // Rebuild to update bookmark icon
+      setState(() {});
     } catch (e) {
-      if(mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed: ${e.toString()}')));
+      if (mounted)
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Failed: ${e.toString()}')));
     }
   }
 
@@ -201,9 +220,10 @@ class __HomePageContentState extends State<_HomePageContent> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => ArticleDetailPage(article: article, token: widget.token),
+        builder: (context) =>
+            ArticleDetailPage(article: article, token: widget.token),
       ),
-    ).then((_) => setState((){})); // Refresh on return
+    ).then((_) => setState(() {}));
   }
 
   @override
@@ -215,7 +235,6 @@ class __HomePageContentState extends State<_HomePageContent> {
       child: CustomScrollView(
         controller: _scrollController,
         slivers: [
-          // AppBar akan mengikuti tema dari main.dart
           SliverAppBar(
             floating: true,
             snap: true,
@@ -225,12 +244,14 @@ class __HomePageContentState extends State<_HomePageContent> {
                 SizedBox(height: 20),
                 Text(
                   'FastNews',
-                  style: GoogleFonts.poppins(fontSize: 32, fontWeight: FontWeight.bold),
+                  style:
+                      GoogleFonts.poppins(fontSize: 32, fontWeight: FontWeight.bold),
                 ),
                 Text(
                   'Kabar Terkini, Dari Kami untuk Negeri',
-                  // Menggunakan warna teks sekunder dari tema
-                  style: GoogleFonts.poppins(fontSize: 14, color: Theme.of(context).textTheme.bodySmall?.color),
+                  style: GoogleFonts.poppins(
+                      fontSize: 14,
+                      color: Theme.of(context).textTheme.bodySmall?.color),
                 ),
               ],
             ),
@@ -243,79 +264,100 @@ class __HomePageContentState extends State<_HomePageContent> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const SizedBox(height: 16),
-                  Text('Trending news', style: GoogleFonts.poppins(fontSize: 20, fontWeight: FontWeight.w600)),
+                  Text('Trending news',
+                      style: GoogleFonts.poppins(
+                          fontSize: 20, fontWeight: FontWeight.w600)),
                   const SizedBox(height: 16),
                 ],
               ),
             ),
           ),
           SliverToBoxAdapter(
-            child: SizedBox(
-              height: 280,
-              child: FutureBuilder<Map<String, dynamic>>(
-                future: _trendingArticles,
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return Center(child: CircularProgressIndicator());
-                  } else if (snapshot.hasError || !snapshot.hasData || (snapshot.data!['data']?['articles'] as List?)?.isEmpty != false) {
-                    return Center(child: Text('No trending articles'));
-                  }
-                  final articles = snapshot.data!['data']['articles'] as List;
-                  return ListView.builder(
-                    scrollDirection: Axis.horizontal,
-                    padding: EdgeInsets.only(left: 24),
-                    itemCount: articles.length,
-                    itemBuilder: (context, index) {
-                      final article = articles[index];
-                      return Container(
-                        width: 280,
-                        margin: EdgeInsets.only(right: 16),
-                        child: _TrendingNewsCard(
-                          article: article,
-                          token: widget.token,
-                          onBookmark: () => _toggleBookmark(article),
-                          onTap: () => _navigateToArticleDetail(article),
-                        ),
-                      );
-                    },
-                  );
-                },
+            // MEMBUNGKUS DENGAN SCROLLCONFIGURATION
+            child: ScrollConfiguration(
+              behavior: MyCustomScrollBehavior(),
+              child: SizedBox(
+                height: 280,
+                child: FutureBuilder<Map<String, dynamic>>(
+                  future: _trendingArticles,
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return Center(child: CircularProgressIndicator());
+                    } else if (snapshot.hasError ||
+                        !snapshot.hasData ||
+                        (snapshot.data!['data']?['articles'] as List?)
+                                ?.isEmpty !=
+                            false) {
+                      return Center(child: Text('No trending articles'));
+                    }
+                    final articles = snapshot.data!['data']['articles'] as List;
+                    return ListView.builder(
+                      scrollDirection: Axis.horizontal,
+                      padding: EdgeInsets.only(left: 24),
+                      itemCount: articles.length,
+                      itemBuilder: (context, index) {
+                        final article = articles[index];
+                        return Container(
+                          width: 280,
+                          margin: EdgeInsets.only(right: 16),
+                          child: _TrendingNewsCard(
+                            article: article,
+                            token: widget.token,
+                            onBookmark: () => _toggleBookmark(article),
+                            onTap: () => _navigateToArticleDetail(article),
+                          ),
+                        );
+                      },
+                    );
+                  },
+                ),
               ),
             ),
           ),
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(24.0, 24.0, 24.0, 0), // Mengurangi padding bawah
+              padding: const EdgeInsets.fromLTRB(24.0, 24.0, 24.0, 0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                   Text('Latest News', style: GoogleFonts.poppins(fontSize: 20, fontWeight: FontWeight.w600)),
+                  Text('Latest News',
+                      style: GoogleFonts.poppins(
+                          fontSize: 20, fontWeight: FontWeight.w600)),
                   const SizedBox(height: 16),
-                  SizedBox(
-                    height: 50,
-                    child: ListView.builder(
-                      scrollDirection: Axis.horizontal,
-                      itemCount: _categories.length,
-                      itemBuilder: (context, index) {
-                        final category = _categories[index];
-                        final isSelected = _selectedCategory == category;
-                        return Padding(
-                          padding: const EdgeInsets.only(right: 8.0),
-                          child: FilterChip(
-                            label: Text(category),
-                            selected: isSelected,
-                            onSelected: (selected) => _applyCategoryFilter(category),
-                            // Warna adaptif untuk FilterChip
-                            selectedColor: Theme.of(context).primaryColor,
-                            backgroundColor: isDarkMode ? Colors.grey[800] : Colors.grey[200],
-                            labelStyle: GoogleFonts.poppins(
-                              color: isSelected 
-                                ? Colors.white 
-                                : Theme.of(context).textTheme.bodyLarge?.color,
+                  // MEMBUNGKUS DENGAN SCROLLCONFIGURATION
+                  ScrollConfiguration(
+                    behavior: MyCustomScrollBehavior(),
+                    child: SizedBox(
+                      height: 50,
+                      child: ListView.builder(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: _categories.length,
+                        itemBuilder: (context, index) {
+                          final category = _categories[index];
+                          final isSelected = _selectedCategory == category;
+                          return Padding(
+                            padding: const EdgeInsets.only(right: 8.0),
+                            child: FilterChip(
+                              label: Text(category),
+                              selected: isSelected,
+                              onSelected: (selected) =>
+                                  _applyCategoryFilter(category),
+                              selectedColor: Theme.of(context).primaryColor,
+                              backgroundColor: isDarkMode
+                                  ? Colors.grey[800]
+                                  : Colors.grey[200],
+                              labelStyle: GoogleFonts.poppins(
+                                color: isSelected
+                                    ? Colors.white
+                                    : Theme.of(context)
+                                        .textTheme
+                                        .bodyLarge
+                                        ?.color,
+                              ),
                             ),
-                          ),
-                        );
-                      },
+                          );
+                        },
+                      ),
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -323,37 +365,41 @@ class __HomePageContentState extends State<_HomePageContent> {
               ),
             ),
           ),
-          _filteredArticles.isEmpty && !_isRefreshing 
-            ? SliverFillRemaining(child: Center(child: Text("No articles found")))
-            : SliverList(
-              delegate: SliverChildBuilderDelegate(
-                (context, index) {
-                  final article = _filteredArticles[index];
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-                    child: _LatestNewsItem(
-                      article: article,
-                      token: widget.token,
-                      onBookmark: () => _toggleBookmark(article),
-                      onTap: () => _navigateToArticleDetail(article),
-                    ),
-                  );
-                },
-                childCount: _filteredArticles.length,
-              ),
-            ),
-           SliverToBoxAdapter(
-              child: _isLoadingMore ? Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Center(child: CircularProgressIndicator()),
-              ) : SizedBox(),
-            ),
+          _filteredArticles.isEmpty && !_isRefreshing
+              ? SliverFillRemaining(child: Center(child: Text("No articles found")))
+              : SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (context, index) {
+                      final article = _filteredArticles[index];
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 24, vertical: 8),
+                        child: _LatestNewsItem(
+                          article: article,
+                          token: widget.token,
+                          onBookmark: () => _toggleBookmark(article),
+                          onTap: () => _navigateToArticleDetail(article),
+                        ),
+                      );
+                    },
+                    childCount: _filteredArticles.length,
+                  ),
+                ),
+          SliverToBoxAdapter(
+            child: _isLoadingMore
+                ? Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Center(child: CircularProgressIndicator()),
+                  )
+                : SizedBox(),
+          ),
         ],
       ),
     );
   }
 }
 
+// ... (Widget _TrendingNewsCard dan _LatestNewsItem tetap sama)
 class _TrendingNewsCard extends StatefulWidget {
   final Map<String, dynamic> article;
   final String token;
@@ -472,7 +518,7 @@ class _LatestNewsItemState extends State<_LatestNewsItem> {
     return GestureDetector(
       onTap: widget.onTap,
       child: Card(
-         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         elevation: 3,
         margin: EdgeInsets.only(bottom: 16),
         child: Column(
