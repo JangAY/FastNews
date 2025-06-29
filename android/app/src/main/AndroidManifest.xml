@@ -1,6 +1,21 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<!-- ===== PERMISSIONS ===== -->
+    <!-- Internet -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Kamera -->
+    <uses-permission android:name="android.permission.CAMERA" />
+
+    <!-- Akses berkas (Android 12 ke bawah) -->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+
+    <!-- (Opsional) Deklarasi fitur kamera agar aplikasi tetap bisa di‑install
+         di perangkat tanpa kamera fisik -->
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+
+    <!-- ================================================================ -->
     <application
-        android:label="fastnews"
+        android:label="FastNews"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
