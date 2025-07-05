@@ -11,8 +11,8 @@ class AuthService {
     required String name,
     required String email,
     required String password,
-    String title = 'User', // Default title
-    String avatar = 'https://example.com/avatar.jpg', // Default avatar
+    required String title,
+    required String avatar,
   }) async {
     final url = Uri.parse('$baseUrl/auth/register');
     final response = await http.post(

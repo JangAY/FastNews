@@ -13,6 +13,9 @@ class _RegisterPageState extends State<RegisterPage> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
+  final _avatarController = TextEditingController();
+  final _titleController = TextEditingController();
+  
   bool _isPasswordVisible = false;
   bool _isConfirmPasswordVisible = false;
   bool _isLoading = false;
@@ -31,9 +34,11 @@ class _RegisterPageState extends State<RegisterPage> {
     final String name = _nameController.text.trim();
     final String email = _emailController.text.trim();
     final String password = _passwordController.text.trim();
+    final String title = _titleController.text.trim();
+    final String avatar = _avatarController.text.trim();
     final String confirmPassword = _confirmPasswordController.text.trim();
 
-    if (name.isEmpty || email.isEmpty || password.isEmpty || confirmPassword.isEmpty) {
+    if (name.isEmpty || email.isEmpty || password.isEmpty || confirmPassword.isEmpty || avatar.isEmpty || title.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Please fill all fields')),
       );
@@ -61,6 +66,8 @@ class _RegisterPageState extends State<RegisterPage> {
         name: name,
         email: email,
         password: password,
+        title: title,
+        avatar: avatar,
       );
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -177,6 +184,42 @@ class _RegisterPageState extends State<RegisterPage> {
                             style: GoogleFonts.poppins(),
                             decoration: InputDecoration(
                               hintText: 'Email',
+                              prefixIcon: Icon(Icons.email_outlined),
+                              border: InputBorder.none,
+                              contentPadding: EdgeInsets.all(16),
+                            ),
+                          ),
+                        ),
+                        SizedBox(height: 16),
+                         Container(
+                          decoration: BoxDecoration(
+                            border: Border.all(color: Colors.grey[300]!),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: TextField(
+                            controller: _titleController,
+                            keyboardType: TextInputType.text,
+                            style: GoogleFonts.poppins(),
+                            decoration: InputDecoration(
+                              hintText: 'Title',
+                              prefixIcon: Icon(Icons.email_outlined),
+                              border: InputBorder.none,
+                              contentPadding: EdgeInsets.all(16),
+                            ),
+                          ),
+                        ),
+                        SizedBox(height: 16),
+                         Container(
+                          decoration: BoxDecoration(
+                            border: Border.all(color: Colors.grey[300]!),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: TextField(
+                            controller: _avatarController,
+                            keyboardType: TextInputType.text,
+                            style: GoogleFonts.poppins(),
+                            decoration: InputDecoration(
+                              hintText: 'Avatar',
                               prefixIcon: Icon(Icons.email_outlined),
                               border: InputBorder.none,
                               contentPadding: EdgeInsets.all(16),
