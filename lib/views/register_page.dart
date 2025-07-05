@@ -201,8 +201,8 @@ class _RegisterPageState extends State<RegisterPage> {
                             keyboardType: TextInputType.text,
                             style: GoogleFonts.poppins(),
                             decoration: InputDecoration(
-                              hintText: 'Title',
-                              prefixIcon: Icon(Icons.email_outlined),
+                              hintText: 'Title (User, Journalist, Software Dev, etc)',
+                              prefixIcon: Icon(Icons.info_outlined),
                               border: InputBorder.none,
                               contentPadding: EdgeInsets.all(16),
                             ),
@@ -219,8 +219,8 @@ class _RegisterPageState extends State<RegisterPage> {
                             keyboardType: TextInputType.text,
                             style: GoogleFonts.poppins(),
                             decoration: InputDecoration(
-                              hintText: 'Avatar',
-                              prefixIcon: Icon(Icons.email_outlined),
+                              hintText: 'Url Avatar',
+                              prefixIcon: Icon(Icons.photo_outlined),
                               border: InputBorder.none,
                               contentPadding: EdgeInsets.all(16),
                             ),
